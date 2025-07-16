@@ -1,0 +1,76 @@
+[tool.poetry]
+name = "okami"
+version = "0.1.0"
+description = "Orchestrated Knowledge-driven Autonomous Multi-agent Intelligence"
+authors = ["OKAMI Team"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+crewai = {extras = ["tools"], version = "^0.140.0"}
+fastapi = "^0.115.5"
+uvicorn = "^0.32.1"
+pydantic = "^2.10.3"
+pydantic-settings = "^2.6.1"
+chromadb = "^0.5.23"
+python-dotenv = "^1.0.1"
+structlog = "^24.4.0"
+prometheus-client = "^0.21.0"
+httpx = "^0.28.1"
+mem0ai = "^1.1.4"
+opentelemetry-api = "^1.29.0"
+opentelemetry-sdk = "^1.29.0"
+opentelemetry-instrumentation-fastapi = "^0.50b0"
+sqlalchemy = "^2.0.36"
+alembic = "^1.14.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+pytest-asyncio = "^0.24.0"
+pytest-cov = "^6.0.0"
+black = "^24.10.0"
+flake8 = "^7.1.1"
+mypy = "^1.13.0"
+isort = "^5.13.2"
+pre-commit = "^4.0.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers --cov=okami --cov-report=term-missing"
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"

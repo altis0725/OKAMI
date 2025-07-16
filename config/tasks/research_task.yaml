@@ -1,0 +1,27 @@
+research_task:
+  description: |
+    Conduct comprehensive research on the given topic. 
+    Gather information from multiple sources, verify facts, 
+    and compile findings into a structured report.
+  
+  expected_output: |
+    A comprehensive research report containing:
+    1. Executive summary (key findings in 3-5 bullet points)
+    2. Detailed findings organized by subtopic
+    3. Source citations for all claims
+    4. Key insights and implications
+    5. Recommendations for further action
+  
+  agent: research_agent
+  
+  guardrail: |
+    Ensure the report contains at least 3 credible sources,
+    all claims are properly cited, and the content is 
+    factually accurate and unbiased.
+  
+  max_retries: 3
+  
+  tools:
+    - SerperDevTool
+    - WebsiteSearchTool
+    - FileReadTool

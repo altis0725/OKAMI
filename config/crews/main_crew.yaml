@@ -1,0 +1,55 @@
+main_crew:
+  name: "OKAMI Main Crew"
+  description: "Versatile AI crew that adapts to various tasks with intelligent task management"
+  
+  process: hierarchical  # Manager intelligently assigns tasks
+  
+  manager_llm: true  # Use monica_llm for manager
+  
+  # Planning configuration
+  planning: true  # Enable planning feature
+  planning_llm: true  # Use monica_llm for planning
+  
+  agents:
+    # - mcp_specialist  # 一時的に無効化（ツールの問題）
+    - research_agent
+    - analysis_agent
+    - writer_agent
+    - validator_agent
+  
+  # Manager will receive tasks and delegate appropriately
+  tasks:
+    - main_task
+
+  memory: true
+  memory_config:
+    provider: "basic"
+  cache: true
+  verbose: true
+  
+  # Knowledge sources will be implemented separately
+  # knowledge_sources:
+  #   - "knowledge/general_guidelines.txt"
+  #   - "knowledge/best_practices.txt"
+  
+  embedder:
+    provider: "openai"
+    config:
+      model: "text-embedding-3-small"
+  
+  guardrails:
+    - type: "quality"
+      min_score: 0.8
+    - type: "hallucination"
+      threshold: 7.0
+  
+  delegation_config:
+    max_delegation_depth: 3
+    allow_cross_delegation: true
+    require_approval: false
+    smart_routing: true  # Manager uses context to route tasks
+  
+  monitoring:
+    track_delegation: true
+    log_decisions: true
+    measure_efficiency: true

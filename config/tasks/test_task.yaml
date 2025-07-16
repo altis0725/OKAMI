@@ -1,0 +1,7 @@
+test_task:
+  description: |
+    Process the user's request and provide a helpful response.
+  expected_output: |
+    A helpful and informative response to the user's query.
+  agent: research_agent  # 明示的にエージェントを指定
+  max_retries: 3

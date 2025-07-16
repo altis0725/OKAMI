@@ -1,0 +1,22 @@
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy monitoring requirements
+COPY monitoring/requirements.txt monitoring/
+RUN pip install --no-cache-dir -r monitoring/requirements.txt
+
+# Copy monitoring code
+COPY monitoring/ monitoring/
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+
+# Run the quality monitor
+CMD ["python", "-m", "monitoring.claude_quality_monitor"]

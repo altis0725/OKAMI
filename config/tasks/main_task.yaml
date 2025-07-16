@@ -1,0 +1,14 @@
+main_task:
+  description: |
+    Process the user's request by analyzing the requirements and delegating to appropriate specialists.
+    As the manager, you should:
+    1. Understand the user's request completely
+    2. Break down the task into subtasks if necessary
+    3. Assign work to the most suitable agents
+    4. Coordinate the responses
+    5. Ensure quality and completeness
+  expected_output: |
+    A comprehensive response that addresses all aspects of the user's request,
+    with high quality and properly validated results. Output in the same language as the input.
+  guardrail: quality
+  max_retries: 3

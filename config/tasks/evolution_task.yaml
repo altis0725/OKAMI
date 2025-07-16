@@ -1,0 +1,30 @@
+evolution_task:
+  description: |
+    Analyze system performance metrics and agent behaviors to
+    identify evolution opportunities. Generate actionable insights
+    for system improvement and adaptation.
+  
+  expected_output: |
+    An evolution report containing:
+    1. Performance metrics analysis
+    2. Identified success/failure patterns
+    3. Learning opportunities discovered
+    4. System bottlenecks and inefficiencies
+    5. Prioritized improvement recommendations
+    6. Evolution implementation roadmap
+  
+  agent: evolution_agent
+  
+  guardrail: |
+    Recommendations must be data-driven, feasible to implement,
+    and include measurable success criteria. Impact assessment
+    required for each recommendation.
+  
+  max_retries: 2
+  
+  schedule: "0 */6 * * *"  # Run every 6 hours
+  
+  tools:
+    - FileReadTool
+    - JSONSearchTool
+    - FileWriteTool

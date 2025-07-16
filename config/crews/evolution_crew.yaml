@@ -1,0 +1,44 @@
+evolution_crew:
+  name: "System Evolution Crew"
+  description: "A specialized crew for monitoring and evolving the OKAMI system"
+  
+  process: sequential
+  
+  agents:
+    - evolution_agent
+    - analysis_agent
+    - validator_agent
+  
+  tasks:
+    - evolution_task
+  
+  memory: true
+  cache: false  # Always fresh analysis
+  verbose: true
+  
+  knowledge_sources:
+    - "knowledge/evolution_strategies.txt"
+    - "knowledge/performance_baselines.txt"
+  
+  embedder:
+    provider: "openai"
+    config:
+      model: "text-embedding-3-small"
+  
+  schedule:
+    enabled: true
+    cron: "0 0 * * *"  # Daily at midnight
+    timezone: "UTC"
+  
+  triggers:
+    - type: "performance_drop"
+      threshold: 0.7
+    - type: "error_rate"
+      threshold: 0.2
+    - type: "manual"
+  
+  evolution_config:
+    min_data_points: 100
+    confidence_threshold: 0.8
+    max_recommendations: 10
+    auto_apply: false

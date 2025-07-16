@@ -1,0 +1,31 @@
+writing_task:
+  description: |
+    Create high-quality content based on the research and analysis
+    findings. Adapt the writing style to the target audience and
+    purpose while maintaining clarity and engagement.
+  
+  expected_output: |
+    Well-crafted content that includes:
+    1. Engaging introduction
+    2. Clear main points with supporting evidence
+    3. Logical flow and smooth transitions
+    4. Appropriate tone for the audience
+    5. Strong conclusion with call to action
+    6. Proper formatting and structure
+  
+  agent: writer_agent
+  
+  context:
+    - research_task
+    - analysis_task
+  
+  guardrail: |
+    Content must be original, grammatically correct,
+    properly structured, and appropriate for the intended
+    audience. Minimum 500 words unless specified otherwise.
+  
+  max_retries: 2
+  
+  tools:
+    - FileWriteTool
+    - FileReadTool

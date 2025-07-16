@@ -1,0 +1,31 @@
+analysis_task:
+  description: |
+    Analyze the provided data or information to identify patterns,
+    trends, and actionable insights. Use appropriate analytical
+    methods and present findings in a clear, structured format.
+  
+  expected_output: |
+    An analytical report containing:
+    1. Data overview and quality assessment
+    2. Key findings with statistical support
+    3. Identified patterns and trends
+    4. Anomalies or outliers detected
+    5. Actionable insights and recommendations
+    6. Confidence levels and limitations
+  
+  agent: analysis_agent
+  
+  context:
+    - research_task  # Can use output from research task
+  
+  guardrail: |
+    Ensure all analytical claims are supported by data,
+    statistical methods are appropriate, and limitations
+    are clearly stated. Include confidence levels for insights.
+  
+  max_retries: 2
+  
+  tools:
+    - FileReadTool
+    - CSVSearchTool
+    - CodeInterpreterTool

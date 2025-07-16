@@ -1,0 +1,34 @@
+validation_task:
+  description: |
+    Validate all outputs from previous tasks to ensure they meet
+    quality standards, are accurate, complete, and ready for use.
+    Provide detailed feedback and improvement suggestions.
+  
+  expected_output: |
+    A validation report containing:
+    1. Overall quality assessment (pass/fail)
+    2. Accuracy verification results
+    3. Completeness checklist
+    4. Identified issues or gaps
+    5. Specific improvement recommendations
+    6. Final approval status
+  
+  agent: validator_agent
+  
+  context:
+    - research_task
+    - analysis_task
+    - writing_task
+  
+  guardrail: |
+    Validation must be thorough and objective. All issues
+    must be clearly documented with specific examples and
+    constructive feedback for improvement.
+  
+  human_input: false  # Can be set to true for human review
+  
+  max_retries: 1
+  
+  tools:
+    - FileReadTool
+    - DirectoryReadTool

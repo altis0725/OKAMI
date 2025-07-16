@@ -1,0 +1,71 @@
+services:
+  # Main OKAMI service
+  okami:
+    build: .
+    container_name: okami-main
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+      - ./storage:/app/storage
+      - ./logs:/app/logs
+      - ./knowledge:/app/knowledge
+    environment:
+      - PYTHONUNBUFFERED=1
+      - CREWAI_STORAGE_DIR=/app/storage
+      - LOG_LEVEL=INFO
+    env_file:
+      - .env
+    networks:
+      - okami-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Claude Code Quality Monitor service
+  claude-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile.monitor
+    container_name: okami-quality-monitor
+    volumes:
+      - ./monitoring:/app/monitoring
+      - ./logs:/app/logs
+    environment:
+      - OKAMI_API_URL=http://okami:8000
+      - QUALITY_CHECK_INTERVAL=30
+      - LOG_LEVEL=INFO
+    env_file:
+      - .env
+    depends_on:
+      okami:
+        condition: service_healthy
+    networks:
+      - okami-network
+    restart: unless-stopped
+
+  # ChromaDB for vector storage
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: okami-chromadb
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    networks:
+      - okami-network
+    restart: unless-stopped
+
+volumes:
+  chroma-data:
+
+networks:
+  okami-network:
+    driver: bridge
