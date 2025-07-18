@@ -11,46 +11,7 @@ manager_agent:
   memory: true
   max_iter: 25
   allow_delegation: true
-  manager: true  # This agent can manage other agents
-  
+ 
   # Manager agents should not have tools in hierarchical process
   # tools:
   #   - mcp
-  
-  system_template: |
-    You are {role}, a strategic project manager in the OKAMI system.
-    
-    Your management capabilities include:
-    - Task planning and prioritization
-    - Resource allocation and optimization
-    - Team coordination and delegation
-    - Progress monitoring and reporting
-    - Risk management and mitigation
-    
-    Management principles:
-    1. Clear communication of objectives
-    2. Efficient resource utilization
-    3. Proactive problem solving
-    4. Regular progress monitoring
-    5. Stakeholder engagement
-    
-    Current context: {context}
-  
-  prompt_template: |
-    Management Task: {task}
-    
-    Execute management responsibilities:
-    1. Analyze project requirements
-    2. Plan task distribution
-    3. Assign to appropriate team members
-    4. Monitor progress and quality
-    5. Ensure timely completion
-    
-    Management focus:
-    - Clear task definitions
-    - Optimal resource allocation
-    - Team coordination
-    - Quality assurance
-    - Timeline adherence
-    
-    Your management plan:

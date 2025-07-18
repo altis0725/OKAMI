@@ -1,6 +1,6 @@
 """
-OKAMI Helper Functions
-Common utility functions used throughout the system
+OKAMI用ヘルパー関数群
+システム全体で使う共通ユーティリティ
 """
 
 import re
@@ -13,13 +13,13 @@ import json
 
 def generate_unique_id(prefix: str = "okami") -> str:
     """
-    Generate unique ID with prefix
+    プレフィックス付きユニークID生成
 
     Args:
-        prefix: ID prefix
+        prefix: IDの接頭辞
 
     Returns:
-        Unique ID string
+        ユニークID文字列
     """
     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
     unique_part = str(uuid.uuid4())[:8]
@@ -28,13 +28,13 @@ def generate_unique_id(prefix: str = "okami") -> str:
 
 def format_duration(seconds: float) -> str:
     """
-    Format duration in human-readable format
+    秒数を人間向けに整形
 
     Args:
-        seconds: Duration in seconds
+        seconds: 秒数
 
     Returns:
-        Formatted duration string
+        整形済み文字列
     """
     if seconds < 1:
         return f"{seconds*1000:.0f}ms"
@@ -52,14 +52,14 @@ def format_duration(seconds: float) -> str:
 
 def sanitize_string(text: str, max_length: Optional[int] = None) -> str:
     """
-    Sanitize string for safe usage
+    文字列を安全に整形
 
     Args:
-        text: Input text
-        max_length: Maximum length
+        text: 入力文字列
+        max_length: 最大長
 
     Returns:
-        Sanitized string
+        整形済み文字列
     """
     # Remove control characters
     text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', text)
@@ -76,13 +76,13 @@ def sanitize_string(text: str, max_length: Optional[int] = None) -> str:
 
 def calculate_hash(data: Union[str, Dict, List]) -> str:
     """
-    Calculate SHA256 hash of data
+    データのSHA256ハッシュ計算
 
     Args:
-        data: Data to hash
+        data: ハッシュ化対象
 
     Returns:
-        Hash string
+        ハッシュ文字列
     """
     if isinstance(data, (dict, list)):
         data = json.dumps(data, sort_keys=True)
@@ -94,13 +94,13 @@ def calculate_hash(data: Union[str, Dict, List]) -> str:
 
 def parse_time_window(window_str: str) -> timedelta:
     """
-    Parse time window string to timedelta
+    時間ウィンドウ文字列をtimedeltaに変換
 
     Args:
-        window_str: Time window string (e.g., "1h", "30m", "1d")
+        window_str: 例 "1h", "30m", "1d"
 
     Returns:
-        timedelta object
+        timedeltaオブジェクト
     """
     pattern = r'^(\d+)([hdms])$'
     match = re.match(pattern, window_str.lower())
@@ -125,13 +125,13 @@ def parse_time_window(window_str: str) -> timedelta:
 
 def extract_json_from_text(text: str) -> Optional[Dict]:
     """
-    Extract JSON object from text
+    テキストからJSONオブジェクト抽出
 
     Args:
-        text: Text containing JSON
+        text: JSONを含むテキスト
 
     Returns:
-        Extracted JSON dict or None
+        抽出したJSON辞書またはNone
     """
     # Try to find JSON block
     json_pattern = r'```json\s*(.*?)\s*```'
@@ -155,15 +155,15 @@ def extract_json_from_text(text: str) -> Optional[Dict]:
 
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> List[str]:
     """
-    Split text into chunks with overlap
+    テキストを重複付きで分割
 
     Args:
-        text: Text to chunk
-        chunk_size: Size of each chunk
-        overlap: Overlap between chunks
+        text: 分割対象
+        chunk_size: チャンクサイズ
+        overlap: チャンク間の重複
 
     Returns:
-        List of text chunks
+        チャンクリスト
     """
     if not text or chunk_size <= 0:
         return []
@@ -193,14 +193,14 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> List[st
 
 def merge_dicts(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Deep merge two dictionaries
+    2つの辞書を再帰的にマージ
 
     Args:
-        dict1: First dictionary
-        dict2: Second dictionary (takes precedence)
+        dict1: 1つ目の辞書
+        dict2: 2つ目（優先）
 
     Returns:
-        Merged dictionary
+        マージ済み辞書
     """
     result = dict1.copy()
     
@@ -215,15 +215,15 @@ def merge_dicts(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
 
 def truncate_dict(data: Dict[str, Any], max_depth: int = 3, max_items: int = 10) -> Dict[str, Any]:
     """
-    Truncate dictionary for logging
+    ログ用に辞書を省略整形
 
     Args:
-        data: Dictionary to truncate
-        max_depth: Maximum nesting depth
-        max_items: Maximum items per level
+        data: 対象辞書
+        max_depth: 最大ネスト深さ
+        max_items: 各階層の最大件数
 
     Returns:
-        Truncated dictionary
+        省略済み辞書
     """
     def _truncate(obj: Any, depth: int) -> Any:
         if depth > max_depth:

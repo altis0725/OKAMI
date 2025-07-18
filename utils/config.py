@@ -1,6 +1,6 @@
 """
-OKAMI Configuration Management
-Handles system configuration and environment variables
+OKAMI設定管理
+システム設定・環境変数の管理を担当
 """
 
 import os
@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 
 
 class OkamiConfig(BaseSettings):
-    """OKAMI System Configuration"""
+    """OKAMIシステムの設定クラス"""
 
     # API Keys
     monica_api_key: str = Field(..., env="MONICA_API_KEY")
@@ -79,7 +79,9 @@ class OkamiConfig(BaseSettings):
     @field_validator("okami_log_level")
     @classmethod
     def validate_log_level(cls, v):
-        """Validate log level"""
+        """
+        ログレベルを検証
+        """
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         if v.upper() not in valid_levels:
             raise ValueError(f"Invalid log level: {v}. Must be one of {valid_levels}")
@@ -88,7 +90,9 @@ class OkamiConfig(BaseSettings):
     @field_validator("embedder_provider")
     @classmethod
     def validate_embedder_provider(cls, v):
-        """Validate embedder provider"""
+        """
+        埋め込みプロバイダを検証
+        """
         valid_providers = [
             "openai", "google", "cohere", "huggingface", "ollama",
             "vertexai", "bedrock", "voyageai", "watson"
@@ -98,7 +102,9 @@ class OkamiConfig(BaseSettings):
         return v.lower()
 
     def get_embedder_config(self) -> Dict[str, Any]:
-        """Get embedder configuration"""
+        """
+        埋め込みモデルの設定を取得
+        """
         config = {
             "provider": self.embedder_provider,
             "config": {
@@ -118,7 +124,9 @@ class OkamiConfig(BaseSettings):
         return config
 
     def get_llm_config(self, model: Optional[str] = None) -> Dict[str, Any]:
-        """Get LLM configuration"""
+        """
+        LLM（大規模言語モデル）の設定を取得
+        """
         return {
             "model": model or "gpt-4o-mini",
             "api_key": self.monica_api_key,
@@ -126,7 +134,9 @@ class OkamiConfig(BaseSettings):
         }
 
     def get_mem0_config(self) -> Dict[str, Any]:
-        """Get Mem0 configuration"""
+        """
+        Mem0用の設定を取得
+        """
         if not self.mem0_api_key:
             return {}
 
@@ -136,16 +146,18 @@ class OkamiConfig(BaseSettings):
         }
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert config to dictionary"""
+        """
+        設定を辞書型に変換
+        """
         return self.model_dump(exclude_unset=True, exclude_none=True)
 
     def save_to_file(self, filepath: str, format: str = "json") -> None:
         """
-        Save configuration to file
+        設定をファイルに保存
 
         Args:
-            filepath: File path
-            format: File format (json or yaml)
+            filepath: ファイルパス
+            format: ファイル形式（jsonまたはyaml）
         """
         config_data = self.to_dict()
         
@@ -170,13 +182,13 @@ class OkamiConfig(BaseSettings):
     @classmethod
     def load_from_file(cls, filepath: str) -> "OkamiConfig":
         """
-        Load configuration from file
+        ファイルから設定を読み込む
 
         Args:
-            filepath: File path
+            filepath: ファイルパス
 
         Returns:
-            Config instance
+            設定インスタンス
         """
         filepath = Path(filepath)
         
@@ -204,7 +216,9 @@ _config_instance: Optional[OkamiConfig] = None
 
 
 def get_config() -> OkamiConfig:
-    """Get global config instance"""
+    """
+    グローバル設定インスタンスを取得
+    """
     global _config_instance
     
     if _config_instance is None:
@@ -218,7 +232,9 @@ def get_config() -> OkamiConfig:
 
 
 def reload_config() -> OkamiConfig:
-    """Reload configuration"""
+    """
+    設定を再読み込み
+    """
     global _config_instance
     
     # Reload .env file

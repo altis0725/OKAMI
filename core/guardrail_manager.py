@@ -1,6 +1,6 @@
 """
-Guardrail Manager for OKAMI system
-Handles task validation, hallucination detection, and quality assurance
+OKAMIシステム用ガードレールマネージャ
+タスク検証・幻覚検出・品質保証を担当
 """
 
 from typing import Callable, Tuple, Any, Dict, List, Optional, Union
@@ -14,14 +14,14 @@ logger = structlog.get_logger()
 
 
 class GuardrailManager:
-    """Manages guardrails for OKAMI tasks"""
+    """OKAMIタスク用ガードレール管理クラス"""
 
     def __init__(self, llm_model: str = "gpt-4o-mini"):
         """
-        Initialize Guardrail Manager
+        ガードレールマネージャの初期化
 
         Args:
-            llm_model: LLM model for guardrail validation
+            llm_model: ガードレール検証用LLMモデル
         """
         self.llm = LLM(model=llm_model)
         self.guardrails: Dict[str, Callable] = {}
@@ -30,7 +30,7 @@ class GuardrailManager:
         logger.info("Guardrail Manager initialized", llm_model=llm_model)
 
     def _init_default_guardrails(self) -> None:
-        """Initialize default guardrails"""
+        """デフォルトのガードレールを初期化"""
         # JSON validation
         self.guardrails["json"] = self.validate_json_output
 
@@ -53,15 +53,15 @@ class GuardrailManager:
         tool_response: Optional[str] = None,
     ) -> HallucinationGuardrail:
         """
-        Create hallucination detection guardrail
+        幻覚検出用ガードレールを作成
 
         Args:
-            context: Reference context for validation
-            threshold: Faithfulness score threshold (0-10)
-            tool_response: Optional tool response context
+            context: 参照コンテキスト
+            threshold: 忠実度スコア閾値（0-10）
+            tool_response: ツール応答の追加文脈
 
         Returns:
-            HallucinationGuardrail instance
+            HallucinationGuardrailインスタンス
         """
         return HallucinationGuardrail(
             context=context,
@@ -71,7 +71,7 @@ class GuardrailManager:
         )
 
     def validate_json_output(self, result: str) -> Tuple[bool, Union[Dict, str]]:
-        """Validate that output is valid JSON"""
+        """出力が有効なJSONか検証"""
         try:
             json_data = json.loads(result)
             return (True, json_data)
@@ -79,14 +79,14 @@ class GuardrailManager:
             return (False, f"Invalid JSON: {str(e)}")
 
     def validate_email_format(self, result: str) -> Tuple[bool, Union[str, str]]:
-        """Validate email address format"""
+        """メールアドレス形式を検証"""
         email_pattern = r"^[\w\.-]+@[\w\.-]+\.\w+$"
         if re.match(email_pattern, result.strip()):
             return (True, result.strip())
         return (False, "Output must be a valid email address")
 
     def filter_sensitive_info(self, result: str) -> Tuple[bool, Union[str, str]]:
-        """Filter sensitive information"""
+        """機密情報をフィルタリング"""
         sensitive_patterns = ["SSN:", "password:", "secret:", "api_key:", "token:"]
         for pattern in sensitive_patterns:
             if pattern.lower() in result.lower():
@@ -96,7 +96,7 @@ class GuardrailManager:
     def validate_word_count(
         self, max_words: int = 200
     ) -> Callable[[str], Tuple[bool, Any]]:
-        """Create word count validator"""
+        """語数上限バリデータを作成"""
 
         def validator(result: str) -> Tuple[bool, Any]:
             word_count = len(result.split())
@@ -107,7 +107,7 @@ class GuardrailManager:
         return validator
 
     def validate_quality(self, result: str) -> Tuple[bool, Any]:
-        """Basic quality validation"""
+        """基本的な品質検証"""
         # Check minimum length
         if len(result.strip()) < 10:
             return (False, "Output is too short")
@@ -124,13 +124,13 @@ class GuardrailManager:
         self, *validators: Callable
     ) -> Callable[[str], Tuple[bool, Any]]:
         """
-        Chain multiple validators
+        複数バリデータを連結
 
         Args:
-            validators: Validator functions to chain
+            validators: 連結するバリデータ関数
 
         Returns:
-            Combined validator function
+            連結バリデータ関数
         """
 
         def combined_validator(result: str) -> Tuple[bool, Any]:
@@ -145,13 +145,13 @@ class GuardrailManager:
 
     def get_guardrail(self, guardrail_type: str) -> Optional[Callable]:
         """
-        Get guardrail by type
+        ガードレール種別で取得
 
         Args:
-            guardrail_type: Type of guardrail
+            guardrail_type: ガードレール種別
 
         Returns:
-            Guardrail function or None
+            ガードレール関数またはNone
         """
         return self.guardrails.get(guardrail_type)
 
@@ -159,11 +159,11 @@ class GuardrailManager:
         self, name: str, validator: Callable[[str], Tuple[bool, Any]]
     ) -> None:
         """
-        Add custom guardrail
+        カスタムガードレールを追加
 
         Args:
-            name: Guardrail name
-            validator: Validator function
+            name: ガードレール名
+            validator: バリデータ関数
         """
         self.guardrails[name] = validator
         logger.info("Custom guardrail added", name=name)
@@ -172,14 +172,14 @@ class GuardrailManager:
         self, description: str, custom_llm: Optional[LLM] = None
     ) -> Callable:
         """
-        Create LLM-based guardrail
+        LLMベースのガードレールを作成
 
         Args:
-            description: Natural language description of validation
-            custom_llm: Optional custom LLM
+            description: バリデーション要件の自然言語説明
+            custom_llm: カスタムLLM
 
         Returns:
-            Guardrail function
+            ガードレール関数
         """
         llm = custom_llm or self.llm
 

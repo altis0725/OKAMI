@@ -1,6 +1,6 @@
 """
-OKAMI Logger Configuration
-Structured logging with multiple outputs and debug capabilities
+OKAMI用ロガー設定
+複数出力・デバッグ対応の構造化ログ
 """
 
 import os
@@ -15,7 +15,7 @@ from structlog.processors import CallsiteParameter
 
 
 class OkamiLogger:
-    """Custom logger for OKAMI system"""
+    """OKAMIシステム用カスタムロガー"""
 
     def __init__(
         self,
@@ -26,14 +26,14 @@ class OkamiLogger:
         enable_file: bool = True,
     ):
         """
-        Initialize OKAMI Logger
+        OKAMIロガーの初期化
 
         Args:
-            log_dir: Directory for log files
-            log_level: Logging level
-            enable_json: Enable JSON formatting
-            enable_console: Enable console output
-            enable_file: Enable file output
+            log_dir: ログ保存ディレクトリ
+            log_level: ログレベル
+            enable_json: JSON形式有効
+            enable_console: コンソール出力有効
+            enable_file: ファイル出力有効
         """
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -47,7 +47,7 @@ class OkamiLogger:
         self._configure_standard_logging()
 
     def _configure_structlog(self) -> None:
-        """Configure structlog"""
+        """structlogの設定"""
         processors = [
             structlog.stdlib.filter_by_level,
             structlog.stdlib.add_logger_name,
@@ -70,7 +70,10 @@ class OkamiLogger:
         processors.append(self._add_okami_context)
 
         if self.enable_json:
-            processors.append(structlog.processors.JSONRenderer())
+            processors.append(structlog.processors.JSONRenderer(
+                sort_keys=False,  # キーをソートしない
+                ensure_ascii=False  # 日本語などのUnicode文字を正しく表示
+            ))
         else:
             processors.append(
                 structlog.dev.ConsoleRenderer(
@@ -87,7 +90,7 @@ class OkamiLogger:
         )
 
     def _configure_standard_logging(self) -> None:
-        """Configure standard logging"""
+        """標準loggingの設定"""
         root_logger = logging.getLogger()
         root_logger.setLevel(self.log_level)
 
@@ -118,7 +121,7 @@ class OkamiLogger:
             root_logger.addHandler(error_handler)
 
     def _get_formatter(self) -> logging.Formatter:
-        """Get log formatter"""
+        """ログフォーマッタ取得"""
         if self.enable_json:
             return logging.Formatter('%(message)s')
         else:
@@ -130,58 +133,74 @@ class OkamiLogger:
     def _add_okami_context(
         self, logger: logging.Logger, method_name: str, event_dict: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Add OKAMI-specific context to logs"""
+        """OKAMI用コンテキストをログに追加"""
+        # タイムスタンプを最初に持ってくるため、新しい辞書を作成
+        ordered_dict = {}
+        
+        # タイムスタンプを最初に配置
+        if "timestamp" in event_dict:
+            ordered_dict["timestamp"] = event_dict.pop("timestamp")
+        
+        # レベルとイベントを2番目に配置
+        if "level" in event_dict:
+            ordered_dict["level"] = event_dict.pop("level")
+        if "event" in event_dict:
+            ordered_dict["event"] = event_dict.pop("event")
+        
+        # 残りのキーをコピー
+        ordered_dict.update(event_dict)
+        
         # Add system context
-        event_dict["okami_version"] = "0.1.0"
+        ordered_dict["okami_version"] = "0.1.0"
         
         # Add environment context
         if os.getenv("OKAMI_CREW_NAME"):
-            event_dict["crew"] = os.getenv("OKAMI_CREW_NAME")
+            ordered_dict["crew"] = os.getenv("OKAMI_CREW_NAME")
         
         if os.getenv("OKAMI_AGENT_ROLE"):
-            event_dict["agent"] = os.getenv("OKAMI_AGENT_ROLE")
+            ordered_dict["agent"] = os.getenv("OKAMI_AGENT_ROLE")
         
         # Add execution context if available
         if hasattr(logger, '_okami_context'):
-            event_dict.update(logger._okami_context)
+            ordered_dict.update(logger._okami_context)
         
-        return event_dict
+        return ordered_dict
 
     def get_logger(self, name: str) -> structlog.BoundLogger:
         """
-        Get a logger instance
+        ロガーインスタンス取得
 
         Args:
-            name: Logger name
+            name: ロガー名
 
         Returns:
-            Configured logger
+            設定済みロガー
         """
         return structlog.get_logger(name)
 
     def add_context(self, logger: structlog.BoundLogger, **kwargs) -> structlog.BoundLogger:
         """
-        Add context to logger
+        ロガーにコンテキスト追加
 
         Args:
-            logger: Logger instance
-            **kwargs: Context key-value pairs
+            logger: ロガーインスタンス
+            **kwargs: 追加コンテキスト
 
         Returns:
-            Logger with context
+            コンテキスト付きロガー
         """
         return logger.bind(**kwargs)
 
     def create_debug_logger(self, name: str, debug_file: Optional[str] = None) -> structlog.BoundLogger:
         """
-        Create a debug logger with detailed output
+        詳細出力用デバッグロガー作成
 
         Args:
-            name: Logger name
-            debug_file: Optional debug file path
+            name: ロガー名
+            debug_file: デバッグファイルパス
 
         Returns:
-            Debug logger
+            デバッグロガー
         """
         debug_logger = self.get_logger(name)
         
@@ -205,13 +224,13 @@ class OkamiLogger:
         metadata: Optional[Dict[str, Any]] = None
     ) -> None:
         """
-        Log performance metrics
+        パフォーマンス指標を記録
 
         Args:
-            logger: Logger instance
-            operation: Operation name
-            duration: Duration in seconds
-            metadata: Additional metadata
+            logger: ロガー
+            operation: 操作名
+            duration: 所要時間（秒）
+            metadata: 追加情報
         """
         log_data = {
             "operation": operation,
@@ -234,15 +253,15 @@ class OkamiLogger:
         metadata: Optional[Dict[str, Any]] = None
     ) -> None:
         """
-        Log agent action
+        エージェントのアクションを記録
 
         Args:
-            logger: Logger instance
-            action: Action type
-            agent_role: Agent role
-            task: Task description
-            result: Action result
-            metadata: Additional metadata
+            logger: ロガー
+            action: アクション種別
+            agent_role: エージェント役割
+            task: タスク説明
+            result: 実行結果
+            metadata: 追加情報
         """
         log_data = {
             "agent_action": action,

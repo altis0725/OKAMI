@@ -1,6 +1,6 @@
 """
-Memory Manager for OKAMI system
-Handles short-term, long-term, and entity memory with Mem0 integration
+OKAMIシステム用メモリマネージャ
+短期・長期・エンティティメモリ管理（Mem0対応）
 """
 
 import os
@@ -16,7 +16,7 @@ logger = structlog.get_logger()
 
 
 class MemoryManager:
-    """Manages all memory types for OKAMI agents"""
+    """OKAMIエージェントの全メモリを管理するクラス"""
 
     def __init__(
         self,
@@ -25,12 +25,12 @@ class MemoryManager:
         mem0_config: Optional[Dict[str, Any]] = None,
     ):
         """
-        Initialize Memory Manager
+        メモリマネージャの初期化
 
         Args:
-            storage_path: Custom storage path for memory
-            use_mem0: Whether to use Mem0 for advanced memory
-            mem0_config: Configuration for Mem0
+            storage_path: メモリ保存先パス
+            use_mem0: Mem0高度メモリ利用有無
+            mem0_config: Mem0設定
         """
         self.storage_path = storage_path or db_storage_path()
         self.use_mem0 = use_mem0
@@ -50,14 +50,14 @@ class MemoryManager:
         )
 
     def _init_long_term_memory(self) -> None:
-        """Initialize long-term memory storage"""
+        """長期メモリストレージ初期化"""
         db_path = os.path.join(self.storage_path, "long_term_memory.db")
         self.long_term_memory = LongTermMemory(
             storage=LTMSQLiteStorage(db_path=db_path)
         )
 
     def _init_external_memory(self) -> None:
-        """Initialize external memory (Mem0) if enabled"""
+        """外部メモリ（Mem0）初期化"""
         if self.use_mem0 and os.getenv("MEM0_API_KEY"):
             try:
                 self.external_memory = ExternalMemory(
@@ -78,7 +78,7 @@ class MemoryManager:
             self.external_memory = None
 
     def get_memory_config(self) -> Dict[str, Any]:
-        """Get memory configuration for CrewAI"""
+        """CrewAI用メモリ設定を取得"""
         config = {
             "memory": True,
             "long_term_memory": self.long_term_memory,
@@ -98,12 +98,12 @@ class MemoryManager:
 
     def save_memory(self, key: str, value: Any, metadata: Optional[Dict] = None) -> None:
         """
-        Save memory entry
+        メモリエントリ保存
 
         Args:
-            key: Memory key
-            value: Memory value
-            metadata: Optional metadata
+            key: メモリキー
+            value: メモリ値
+            metadata: 追加メタデータ
         """
         try:
             if self.external_memory:
@@ -116,15 +116,15 @@ class MemoryManager:
         self, query: str, limit: int = 10, score_threshold: float = 0.5
     ) -> List[Dict]:
         """
-        Search memory
+        メモリ検索
 
         Args:
-            query: Search query
-            limit: Maximum results
-            score_threshold: Minimum relevance score
+            query: 検索クエリ
+            limit: 最大件数
+            score_threshold: 閾値
 
         Returns:
-            List of memory results
+            検索結果リスト
         """
         try:
             if self.external_memory:
@@ -140,10 +140,10 @@ class MemoryManager:
 
     def reset_memory(self, memory_type: str = "all") -> None:
         """
-        Reset memory
+        メモリリセット
 
         Args:
-            memory_type: Type of memory to reset ('short', 'long', 'entity', 'all')
+            memory_type: リセット種別（'short', 'long', 'entity', 'all'）
         """
         try:
             if memory_type in ["all", "external"] and self.external_memory:

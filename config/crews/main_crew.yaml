@@ -5,6 +5,7 @@ main_crew:
   process: hierarchical  # Manager intelligently assigns tasks
   
   manager_llm: true  # Use monica_llm for manager
+  manager_agent: manager_agent
   
   # Planning configuration
   planning: true  # Enable planning feature

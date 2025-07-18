@@ -80,3 +80,8 @@ coverage.xml
 *.temp
 tmp/
 temp/
+
+# Claude Code
+.mcp.json
+CLAUDE.md
+.claude/

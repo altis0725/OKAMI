@@ -12,6 +12,7 @@ import yaml
 from pathlib import Path
 from datetime import datetime
 import time
+import pytest
 
 # Add OKAMI to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -26,6 +27,7 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+@pytest.mark.asyncio
 async def test_basic_crew_creation():
     """Test basic crew creation without agent specification"""
     print("\n=== Testing Basic Crew Creation ===")
@@ -54,6 +56,7 @@ async def test_basic_crew_creation():
         return False
 
 
+@pytest.mark.asyncio
 async def test_self_evolution():
     """Test self-evolution functionality"""
     print("\n=== Testing Self-Evolution System ===")
@@ -143,6 +146,7 @@ This file was created by the self-evolution system.
     return all_exist
 
 
+@pytest.mark.asyncio
 async def test_knowledge_integration():
     """Test knowledge integration in crew"""
     print("\n=== Testing Knowledge Integration ===")
@@ -190,6 +194,7 @@ async def test_knowledge_integration():
     return True
 
 
+@pytest.mark.asyncio
 async def test_guardrail_functionality():
     """Test guardrail functionality"""
     print("\n=== Testing Guardrail Functionality ===")
@@ -474,6 +479,7 @@ The guardrail system ensures content quality by checking:
     return True
 
 
+@pytest.mark.asyncio
 async def test_full_integration():
     """Test full system integration"""
     print("\n=== Testing Full System Integration ===")

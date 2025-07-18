@@ -20,6 +20,7 @@ from tools import get_mcp_tools_for_agent
 from tools.mcp_docker_tool import get_docker_tools
 from knowledge.knowledge_loader import get_knowledge_for_crew
 from guardrails import create_quality_guardrail, create_safety_guardrail, create_accuracy_guardrail
+from utils.helpers import truncate_dict
 
 logger = structlog.get_logger()
 
@@ -145,6 +146,7 @@ class CrewFactory:
             config.setdefault("allow_delegation", True)
             
             # すべての設定パラメータでエージェントを作成
+            logger.info("Agent config used", agent_name=agent_name, config=truncate_dict(config))
             agent = Agent(**config)
             
             logger.info(f"Agent created", role=agent.role)
@@ -185,6 +187,7 @@ class CrewFactory:
             config.setdefault("tools", [])
             
             # すべての設定パラメータでタスクを作成
+            logger.info("Task config used", task_name=task_name, config=truncate_dict(config))
             task = Task(**config)
             
             # 後で解決するためにコンテキスト名を保存
@@ -267,12 +270,11 @@ class CrewFactory:
                 # または指定されている場合はカスタムマネージャーエージェントを使用
                 if config.get("manager_agent"):
                     manager_agent_name = config.get("manager_agent")
-                    if manager_agent_name in agent_map:
-                        # 既に作成されたエージェントの中から名前でエージェントを検索
-                        for agent in agents:
-                            if agent.role == self.agent_configs[manager_agent_name]["role"]:
-                                manager_agent = agent
-                                break
+                    # マネージャーエージェントを作成（まだエージェントリストに含まれていない場合）
+                    manager_agent = self.create_agent(manager_agent_name)
+                    if manager_agent and manager_agent not in agents:
+                        # マネージャーエージェントは階層プロセスでは別扱いなので追加しない
+                        pass
             
             # エンベッダー設定の取得
             embedder_config = config.get("embedder", self.config.get_embedder_config())
@@ -303,6 +305,7 @@ class CrewFactory:
                 config["embedder"] = embedder_config
             
             # すべての設定パラメータでクルーを作成
+            logger.info("Crew config used", crew_name=crew_name, config=truncate_dict(config))
             crew = Crew(**config)
             
             # カスタムメタデータの保存は不要

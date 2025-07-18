@@ -1,6 +1,6 @@
 """
-Knowledge Manager for OKAMI system
-Handles crew-wide and agent-specific knowledge with RAG support
+OKAMIシステム用ナレッジマネージャ
+クルー全体・エージェント個別の知識管理（RAG対応）
 """
 
 import os
@@ -18,7 +18,7 @@ logger = structlog.get_logger()
 
 
 class KnowledgeManager:
-    """Manages knowledge sources for OKAMI system"""
+    """OKAMIシステムの知識ソースを管理するクラス"""
 
     def __init__(
         self,
@@ -26,11 +26,11 @@ class KnowledgeManager:
         embedder_config: Optional[Dict[str, Any]] = None,
     ):
         """
-        Initialize Knowledge Manager
+        ナレッジマネージャの初期化
 
         Args:
-            knowledge_dir: Directory for knowledge files
-            embedder_config: Configuration for embeddings
+            knowledge_dir: 知識ファイルのディレクトリ
+            embedder_config: 埋め込みモデルの設定
         """
         self.knowledge_dir = knowledge_dir or os.path.join(os.getcwd(), "knowledge")
         self.embedder_config = embedder_config or {
@@ -55,7 +55,7 @@ class KnowledgeManager:
         )
 
     def _init_chromadb(self) -> None:
-        """Initialize ChromaDB client for knowledge storage"""
+        """知識ストレージ用ChromaDBクライアント初期化"""
         try:
             storage_path = os.path.join(db_storage_path(), "knowledge")
             self.chroma_client = chromadb.PersistentClient(path=storage_path)
@@ -66,10 +66,10 @@ class KnowledgeManager:
 
     def add_crew_knowledge(self, source: Any) -> None:
         """
-        Add crew-wide knowledge source
+        クルー全体の知識ソースを追加
 
         Args:
-            source: Knowledge source (string, file, etc.)
+            source: 知識ソース（文字列またはファイル等）
         """
         if isinstance(source, str):
             # Check if it's a file path or content
@@ -87,11 +87,11 @@ class KnowledgeManager:
 
     def add_agent_knowledge(self, agent_role: str, source: Any) -> None:
         """
-        Add agent-specific knowledge source
+        エージェント個別の知識ソースを追加
 
         Args:
-            agent_role: Agent role/identifier
-            source: Knowledge source
+            agent_role: エージェントの役割名
+            source: 知識ソース
         """
         if agent_role not in self.agent_sources:
             self.agent_sources[agent_role] = []
@@ -114,7 +114,7 @@ class KnowledgeManager:
         )
 
     def get_crew_knowledge_config(self) -> Dict[str, Any]:
-        """Get crew knowledge configuration"""
+        """クルー全体の知識設定を取得"""
         if not self.crew_sources:
             return {}
 
@@ -127,14 +127,14 @@ class KnowledgeManager:
         self, agent_role: str, knowledge_config: Optional[KnowledgeConfig] = None
     ) -> Dict[str, Any]:
         """
-        Get agent-specific knowledge configuration
+        エージェント個別の知識設定を取得
 
         Args:
-            agent_role: Agent role
-            knowledge_config: Optional knowledge retrieval config
+            agent_role: エージェントの役割
+            knowledge_config: オプションの知識取得設定
 
         Returns:
-            Knowledge configuration dict
+            知識設定の辞書
         """
         sources = self.agent_sources.get(agent_role, [])
         if not sources:
@@ -154,14 +154,14 @@ class KnowledgeManager:
         self, collection_name: str, embedder_config: Optional[Dict] = None
     ) -> KnowledgeStorage:
         """
-        Create custom knowledge storage
+        カスタム知識ストレージを作成
 
         Args:
-            collection_name: Name for the collection
-            embedder_config: Optional custom embedder config
+            collection_name: コレクション名
+            embedder_config: 埋め込み設定
 
         Returns:
-            KnowledgeStorage instance
+            KnowledgeStorageインスタンス
         """
         return KnowledgeStorage(
             embedder=embedder_config or self.embedder_config,
@@ -169,7 +169,7 @@ class KnowledgeManager:
         )
 
     def list_collections(self) -> List[str]:
-        """List all knowledge collections"""
+        """全知識コレクション名をリストで返す"""
         if self.chroma_client:
             collections = self.chroma_client.list_collections()
             return [col.name for col in collections]
@@ -177,13 +177,13 @@ class KnowledgeManager:
 
     def get_collection_info(self, collection_name: str) -> Dict[str, Any]:
         """
-        Get information about a collection
+        コレクション情報を取得
 
         Args:
-            collection_name: Collection name
+            collection_name: コレクション名
 
         Returns:
-            Collection information
+            コレクション情報
         """
         if self.chroma_client:
             try:
@@ -199,10 +199,10 @@ class KnowledgeManager:
 
     def reset_knowledge(self, knowledge_type: str = "all") -> None:
         """
-        Reset knowledge
+        知識をリセット
 
         Args:
-            knowledge_type: Type to reset ('crew', 'agent', 'all')
+            knowledge_type: リセット対象（'crew', 'agent', 'all'）
         """
         try:
             if knowledge_type in ["crew", "all"]:

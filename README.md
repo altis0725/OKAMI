@@ -92,13 +92,12 @@ OKAMI/
 
 ### 前提条件
 - Docker & Docker Compose
-- SEACOR/.envファイル（APIキー用）
 
 ### 手順
 
 ```bash
-# 1. 環境変数の設定（SEACORから）
-cp ../SEACOR/.env .env
+# 1. 環境変数の設定
+cp .env.example .env
 
 # 2. Dockerコンテナの起動
 docker-compose up -d
@@ -195,7 +194,7 @@ mkdir -p nginx/ssl
 ### APIキーエラー
 ```bash
 # SEACORの.envファイルを確認
-cat ../SEACOR/.env | grep MONICA_API_KEY
+cat .env | grep MONICA_API_KEY
 ```
 
 ### MCPツールエラー

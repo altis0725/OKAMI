@@ -1,6 +1,6 @@
 """
-Evolution Tracker for OKAMI system
-Tracks system evolution, learning progress, and performance metrics
+OKAMIシステム用進化トラッカー
+システム進化・学習進捗・性能指標を記録
 """
 
 import json
@@ -14,14 +14,14 @@ logger = structlog.get_logger()
 
 
 class EvolutionTracker:
-    """Tracks and manages system evolution"""
+    """システム進化を記録・管理するクラス"""
 
     def __init__(self, storage_dir: Optional[str] = None):
         """
-        Initialize Evolution Tracker
+        進化トラッカーの初期化
 
         Args:
-            storage_dir: Directory for storing evolution data
+            storage_dir: 進化データ保存ディレクトリ
         """
         self.storage_dir = storage_dir or os.path.join(os.getcwd(), "storage", "evolution")
         Path(self.storage_dir).mkdir(parents=True, exist_ok=True)
@@ -34,7 +34,7 @@ class EvolutionTracker:
         logger.info("Evolution Tracker initialized", storage_dir=self.storage_dir)
 
     def _load_history(self) -> None:
-        """Load existing evolution history"""
+        """進化履歴を読み込む"""
         # Load evolution history
         if os.path.exists(self.evolution_file):
             with open(self.evolution_file, "r") as f:
@@ -57,7 +57,7 @@ class EvolutionTracker:
             self.learning_insights = []
 
     def _save_history(self) -> None:
-        """Save evolution history to disk"""
+        """進化履歴を保存"""
         with open(self.evolution_file, "w") as f:
             json.dump(self.evolution_history, f, indent=2)
 
@@ -76,14 +76,14 @@ class EvolutionTracker:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
-        Track task execution
+        タスク実行を記録
 
         Args:
-            task_id: Task identifier
-            agent_role: Agent that executed the task
-            success: Whether task succeeded
-            execution_time: Time taken to execute
-            metadata: Additional metadata
+            task_id: タスクID
+            agent_role: 実行エージェント
+            success: 成否
+            execution_time: 実行時間
+            metadata: 追加情報
         """
         execution_record = {
             "timestamp": datetime.utcnow().isoformat(),
@@ -134,14 +134,14 @@ class EvolutionTracker:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
-        Record a learning insight
+        学習インサイトを記録
 
         Args:
-            insight_type: Type of insight (e.g., 'pattern', 'optimization')
-            description: Description of the insight
-            source: Source of the insight
-            impact_score: Estimated impact (0-1)
-            metadata: Additional metadata
+            insight_type: インサイト種別
+            description: 説明
+            source: ソース
+            impact_score: 影響度
+            metadata: 追加情報
         """
         insight = {
             "timestamp": datetime.utcnow().isoformat(),
@@ -163,22 +163,22 @@ class EvolutionTracker:
 
     def get_agent_performance(self, agent_role: str) -> Dict[str, Any]:
         """
-        Get performance metrics for an agent
+        エージェントの性能指標を取得
 
         Args:
-            agent_role: Agent role
+            agent_role: エージェント役割
 
         Returns:
-            Performance metrics
+            性能指標
         """
         return self.performance_metrics.get(agent_role, {})
 
     def get_system_performance(self) -> Dict[str, Any]:
         """
-        Get overall system performance
+        システム全体の性能指標を取得
 
         Returns:
-            System-wide metrics
+            システム全体の指標
         """
         total_tasks = sum(m["total_tasks"] for m in self.performance_metrics.values())
         successful_tasks = sum(
@@ -208,14 +208,14 @@ class EvolutionTracker:
         self, limit: int = 10, min_impact: float = 0.5
     ) -> List[Dict[str, Any]]:
         """
-        Get recent high-impact insights
+        直近の高影響インサイトを取得
 
         Args:
-            limit: Maximum number of insights
-            min_impact: Minimum impact score
+            limit: 最大件数
+            min_impact: 最小影響度
 
         Returns:
-            List of insights
+            インサイトリスト
         """
         filtered_insights = [
             i for i in self.learning_insights if i["impact_score"] >= min_impact
@@ -228,10 +228,10 @@ class EvolutionTracker:
 
     def mark_insight_applied(self, insight_index: int) -> None:
         """
-        Mark an insight as applied
+        インサイトを適用済みにマーク
 
         Args:
-            insight_index: Index of the insight
+            insight_index: インサイトのインデックス
         """
         if 0 <= insight_index < len(self.learning_insights):
             self.learning_insights[insight_index]["applied"] = True
@@ -243,10 +243,10 @@ class EvolutionTracker:
 
     def generate_evolution_report(self) -> Dict[str, Any]:
         """
-        Generate evolution report
+        進化レポートを生成
 
         Returns:
-            Comprehensive evolution report
+            総合進化レポート
         """
         system_perf = self.get_system_performance()
         recent_insights = self.get_recent_insights()

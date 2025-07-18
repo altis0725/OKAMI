@@ -134,7 +134,7 @@ async def api_root():
         "name": "OKAMI System API",
         "version": "0.1.0",
         "status": "operational",
-        "description": "オーケストレートされた知識駆動型自律マルチエージェントインテリジェンス""
+        "description": "オーケストレートされた知識駆動型自律マルチエージェントインテリジェンス"
     }
 
 
