@@ -8,9 +8,9 @@ analysis_agent:
     with your ability to communicate complex findings in simple terms make you invaluable.
   
   verbose: true
-  memory: true
+  memory: false
   max_iter: 15
-  allow_delegation: true
+  allow_delegation: false
   
   tools:
     - FileReadTool
@@ -55,3 +55,7 @@ analysis_agent:
     - Actionable recommendations
     
     Your analysis:
+  
+  # エージェント用の知識ソース
+  # knowledge_sources:
+  #   - "knowledge/agents/analysis_agent.md"

@@ -23,6 +23,7 @@ class OkamiConfig(BaseSettings):
         env="OPENAI_API_BASE"
     )
     mem0_api_key: Optional[str] = Field(None, env="MEM0_API_KEY")
+    huggingface_api_key: Optional[str] = Field(None, env="HUGGINGFACE_API_KEY")
 
     # System Settings
     okami_log_level: str = Field(default="INFO", env="OKAMI_LOG_LEVEL")
@@ -42,6 +43,12 @@ class OkamiConfig(BaseSettings):
     # Database Settings
     chroma_host: str = Field(default="localhost", env="CHROMA_HOST")
     chroma_port: int = Field(default=8001, env="CHROMA_PORT")
+    
+    # Vector Store Settings
+    vector_store_type: str = Field(default="qdrant", env="VECTOR_STORE_TYPE")
+    qdrant_host: str = Field(default="localhost", env="QDRANT_HOST")
+    qdrant_port: int = Field(default=6333, env="QDRANT_PORT")
+    qdrant_grpc_port: int = Field(default=6334, env="QDRANT_GRPC_PORT")
 
     # Prometheus Settings
     prometheus_host: str = Field(default="localhost", env="PROMETHEUS_HOST")
@@ -53,8 +60,14 @@ class OkamiConfig(BaseSettings):
 
     # Knowledge Settings
     knowledge_dir: str = Field(default="./knowledge", env="KNOWLEDGE_DIR")
-    embedder_provider: str = Field(default="openai", env="EMBEDDER_PROVIDER")
-    embedder_model: str = Field(default="text-embedding-3-small", env="EMBEDDER_MODEL")
+    embedder_provider: str = Field(default="ollama", env="EMBEDDER_PROVIDER")
+    embedder_model: str = Field(default="mxbai-embed-large", env="EMBEDDER_MODEL")
+    
+    # Embedding Settings (EmbeddingManager用)
+    ollama_base_url: str = Field(default="http://localhost:11434", env="OLLAMA_BASE_URL")
+    embedding_batch_size: int = Field(default=10, env="EMBEDDING_BATCH_SIZE")
+    embedding_max_retries: int = Field(default=3, env="EMBEDDING_MAX_RETRIES")
+    embedding_retry_delay: float = Field(default=1.0, env="EMBEDDING_RETRY_DELAY")
 
     # Guardrail Settings
     guardrail_llm_model: str = Field(default="gpt-4o-mini", env="GUARDRAIL_LLM_MODEL")
@@ -104,6 +117,7 @@ class OkamiConfig(BaseSettings):
     def get_embedder_config(self) -> Dict[str, Any]:
         """
         埋め込みモデルの設定を取得
+        Context7とコミュニティのベストプラクティスに基づく最適化設定
         """
         config = {
             "provider": self.embedder_provider,
@@ -116,10 +130,28 @@ class OkamiConfig(BaseSettings):
         if self.embedder_provider == "openai":
             config["config"]["api_key"] = self.monica_api_key
             config["config"]["base_url"] = self.openai_api_base
+            config["config"]["batch_size"] = self.embedding_batch_size
+            config["config"]["max_retries"] = self.embedding_max_retries
+            config["config"]["retry_delay"] = self.embedding_retry_delay
         elif self.embedder_provider == "google" and os.getenv("GOOGLE_API_KEY"):
             config["config"]["api_key"] = os.getenv("GOOGLE_API_KEY")
         elif self.embedder_provider == "cohere" and os.getenv("COHERE_API_KEY"):
             config["config"]["api_key"] = os.getenv("COHERE_API_KEY")
+        elif self.embedder_provider == "huggingface" and self.huggingface_api_key:
+            config["config"]["api_key"] = self.huggingface_api_key
+            config["config"]["api_url"] = "https://api-inference.huggingface.co"
+        elif self.embedder_provider == "ollama":
+            # Ollama最適化設定（Context7 & コミュニティ推奨）
+            config["config"].update({
+                "base_url": self.ollama_base_url,
+                "batch_size": self.embedding_batch_size,
+                "max_retries": self.embedding_max_retries,
+                "retry_delay": self.embedding_retry_delay,
+                # Ollama API最新仕様に対応
+                "api_endpoint": "/api/embed",  # 推奨エンドポイント
+                "truncate": True,  # コンテキスト長制限対応
+                "keep_alive": "5m"  # モデル保持時間
+            })
 
         return config
 

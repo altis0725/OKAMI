@@ -4,9 +4,9 @@ main_crew:
   
   process: hierarchical  # Manager intelligently assigns tasks
   
-  manager_llm: true  # Use monica_llm for manager
+  # Use custom manager agent instead of default LLM manager
   manager_agent: manager_agent
-  
+
   # Planning configuration
   planning: true  # Enable planning feature
   planning_llm: true  # Use monica_llm for planning
@@ -24,19 +24,16 @@ main_crew:
 
   memory: true
   memory_config:
-    provider: "basic"
+    provider: "mem0"
+    config:
+      user_id: "okami_system"
   cache: true
   verbose: true
   
-  # Knowledge sources will be implemented separately
-  # knowledge_sources:
-  #   - "knowledge/general_guidelines.txt"
-  #   - "knowledge/best_practices.txt"
-  
   embedder:
-    provider: "openai"
+    provider: "ollama"
     config:
-      model: "text-embedding-3-small"
+      model: "mxbai-embed-large"
   
   guardrails:
     - type: "quality"

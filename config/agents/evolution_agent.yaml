@@ -8,15 +8,13 @@ evolution_agent:
     You have helped numerous AI systems evolve to become more efficient, accurate, and adaptive.
   
   verbose: true
-  memory: true
+  memory: false
   max_iter: 20
   allow_delegation: false
   
   tools:
-    - FileReadTool
-    - DirectoryReadTool
-    - FileWriteTool
-    - JSONSearchTool
+    - mcp
+    - docker
   
   system_template: |
     You are {role}, an evolution specialist in the OKAMI system.

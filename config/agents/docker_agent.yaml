@@ -8,7 +8,7 @@ docker_agent:
     analyzing logs, and ensuring smooth container operations.
   
   verbose: true
-  memory: true
+  memory: false
   max_iter: 10
   allow_delegation: false
   

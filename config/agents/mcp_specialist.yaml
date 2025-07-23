@@ -9,7 +9,7 @@ mcp_specialist:
     challenges by leveraging the full spectrum of available MCP tools.
   
   verbose: true
-  memory: true
+  memory: false
   max_iter: 15
   allow_delegation: false
   

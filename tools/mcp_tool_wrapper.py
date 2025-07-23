@@ -6,6 +6,84 @@ Provides a wrapper approach for MCP tools to avoid Pydantic conflicts
 import subprocess
 import json
 from typing import Dict, Any, List, Optional, Callable
+from crewai.tools import BaseTool
+
+
+class MCPDiscoveryTool(BaseTool):
+    """Tool for discovering available MCP tools"""
+    
+    name: str = "mcp_discover"
+    description: str = "Discover available MCP tools and their capabilities"
+    
+    def _run(self) -> str:
+        """
+        Discover available MCP tools
+        
+        Returns:
+            List of available tools
+        """
+        try:
+            result = subprocess.run(
+                "docker mcp gateway list-tools",
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                return result.stdout
+            else:
+                return f"Error discovering tools: {result.stderr}"
+                
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+
+class MCPExecuteTool(BaseTool):
+    """Tool for executing MCP tools"""
+    
+    name: str = "mcp_execute"
+    description: str = "Execute any discovered MCP tool with specified action and parameters"
+    
+    def _run(self, tool_name: str, action: str, **params) -> str:
+        """
+        Execute any discovered MCP tool
+        
+        Args:
+            tool_name: Name of the MCP tool
+            action: Action to perform
+            **params: Parameters for the action
+            
+        Returns:
+            Execution result
+        """
+        try:
+            # Build the MCP command
+            if params:
+                params_json = json.dumps(params)
+                command = f"docker mcp gateway run --tool {tool_name} --action {action} --params '{params_json}'"
+            else:
+                command = f"docker mcp gateway run --tool {tool_name} --action {action}"
+            
+            # Execute the command
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            
+            if result.returncode == 0:
+                return result.stdout
+            else:
+                return f"Error: {result.stderr}"
+                
+        except subprocess.TimeoutExpired:
+            return f"Error: Timeout executing {tool_name}.{action}"
+        except Exception as e:
+            return f"Error: {str(e)}"
 
 
 class MCPToolWrapper:
@@ -161,9 +239,9 @@ def get_mcp_execute_tool() -> Callable:
     return execute_mcp_tool
 
 
-def get_mcp_tools_for_agent() -> List[Callable]:
+def get_mcp_tools_for_agent() -> List[BaseTool]:
     """Get core MCP tools for CrewAI agents"""
     return [
-        get_mcp_discovery_tool(),
-        get_mcp_execute_tool()
+        MCPDiscoveryTool(),
+        MCPExecuteTool()
     ]

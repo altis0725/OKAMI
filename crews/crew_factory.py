@@ -16,9 +16,10 @@ from core.guardrail_manager import GuardrailManager
 from crewai import Process
 from crewai.project import CrewBase
 from utils.config import get_config
-from tools import get_mcp_tools_for_agent
+from tools import get_mcp_tools_for_agent, search_knowledge, add_knowledge_to_base
 from tools.mcp_docker_tool import get_docker_tools
-from knowledge.knowledge_loader import get_knowledge_for_crew
+from models.evolution_output import EvolutionChanges
+# knowledge_loaderは削除 - CrewAI標準のknowledge_sourcesを使用
 from guardrails import create_quality_guardrail, create_safety_guardrail, create_accuracy_guardrail
 from utils.helpers import truncate_dict
 
@@ -50,6 +51,10 @@ class CrewFactory:
         self.agent_configs = self._load_configs("agents")
         self.task_configs = self._load_configs("tasks")
         self.crew_configs = self._load_configs("crews")
+        
+        # 共有KnowledgeManagerインスタンス（自動初期化）
+        self._knowledge_manager = None
+        self._initialize_knowledge_manager()
         
         logger.info(
             "Crew Factory initialized",
@@ -84,6 +89,45 @@ class CrewFactory:
                 logger.error(f"Failed to load config", file=file_path.name, error=str(e))
         
         return configs
+    
+    def _initialize_knowledge_manager(self):
+        """KnowledgeManagerの初期化と自動セットアップ"""
+        try:
+            if self._knowledge_manager is None:
+                self._knowledge_manager = KnowledgeManager(
+                    knowledge_dir=self.config.knowledge_dir,
+                    embedder_config=self.config.get_embedder_config()
+                )
+                
+                # 知識の自動初期化
+                success = self._knowledge_manager.auto_initialize_knowledge()
+                if success:
+                    logger.info("Knowledge manager auto-initialized successfully")
+                else:
+                    logger.warning("Knowledge manager auto-initialization had issues")
+                    
+        except Exception as e:
+            logger.error(f"Failed to initialize knowledge manager: {e}")
+            # フォールバック：基本的なKnowledgeManagerを作成
+            self._knowledge_manager = KnowledgeManager(
+                knowledge_dir=self.config.knowledge_dir,
+                embedder_config=self.config.get_embedder_config()
+            )
+    
+    def refresh_knowledge(self, force_reload: bool = False) -> Dict[str, Any]:
+        """
+        知識を手動で更新
+        
+        Args:
+            force_reload: 強制的に再読み込みするかどうか
+            
+        Returns:
+            更新結果の統計
+        """
+        if self._knowledge_manager is None:
+            self._initialize_knowledge_manager()
+        
+        return self._knowledge_manager.refresh_knowledge_from_directory(force_reload)
 
     def create_agent(self, agent_name: str) -> Optional[Agent]:
         """
@@ -125,19 +169,40 @@ class CrewFactory:
                     for tool_name in tools_config:
                         if tool_name in docker_tool_map:
                             agent_tools.append(docker_tool_map[tool_name])
+                
+                # 知識検索ツールのチェック
+                if "knowledge_search" in tools_config:
+                    agent_tools.append(search_knowledge)
+                if "add_knowledge" in tools_config:
+                    agent_tools.append(add_knowledge_to_base)
+                
+                # その他のツール名をチェック（将来的に拡張可能）
+                for tool_name in tools_config:
+                    if isinstance(tool_name, str) and tool_name not in ["mcp", "docker", "knowledge_search", "add_knowledge"]:
+                        logger.warning(f"Unknown tool type", tool_name=tool_name)
             
-            # 知識コンテキストを取得
-            knowledge_context = get_knowledge_for_crew()
-            
-            # 利用可能な場合、知識をバックストーリーに追加
-            backstory = config.get("backstory", "")
-            if knowledge_context:
-                backstory = f"{backstory}\n\n{knowledge_context}"
+            # エージェント用の知識ソースを設定（CrewAI標準機能）
+            agent_knowledge_sources = []
+            if config.get("knowledge_sources"):
+                # 共有KnowledgeManagerインスタンスを使用
+                if self._knowledge_manager is None:
+                    self._knowledge_manager = KnowledgeManager(
+                        knowledge_dir=self.config.knowledge_dir,
+                        embedder_config=self.config.get_embedder_config()
+                    )
+                
+                for source in config["knowledge_sources"]:
+                    self._knowledge_manager.add_agent_knowledge(agent_name, source)
+                
+                agent_knowledge_sources = self._knowledge_manager.get_agent_knowledge_config(agent_name)
             
             # Update config with processed values
-            config["backstory"] = backstory
             config["tools"] = agent_tools
             config["llm"] = self.monica_llm
+            
+            # エージェント用の知識ソースを追加
+            if agent_knowledge_sources:
+                config.update(agent_knowledge_sources)
             
             # 指定されていない場合、デフォルト値を設定
             config.setdefault("verbose", True)
@@ -149,7 +214,7 @@ class CrewFactory:
             logger.info("Agent config used", agent_name=agent_name, config=truncate_dict(config))
             agent = Agent(**config)
             
-            logger.info(f"Agent created", role=agent.role)
+            logger.info(f"Agent created", role=agent.role, tools=len(agent_tools))
             return agent
             
         except Exception as e:
@@ -183,18 +248,72 @@ class CrewFactory:
             if "context" in config and isinstance(config["context"], list):
                 context_names = config.pop("context")
             
-            # デフォルトでツールを設定
-            config.setdefault("tools", [])
+            # Toolsの処理
+            task_tools = []
+            if config.get("tools"):
+                tools_config = config.get("tools", [])
+                
+                # MCPツールのチェック
+                if any("mcp" in str(tool).lower() for tool in tools_config):
+                    task_tools.extend(get_mcp_tools_for_agent())
+                
+                # Dockerツールのチェック
+                if any("docker" in str(tool).lower() for tool in tools_config):
+                    # 特定のDockerツールを取得
+                    docker_tools = get_docker_tools()
+                    docker_tool_map = {
+                        "docker_list_containers": docker_tools[0],
+                        "docker_container_logs": docker_tools[1],
+                        "docker_exec": docker_tools[2],
+                        "docker_manage_container": docker_tools[3]
+                    }
+                    # リクエストされたDockerツールのみ追加
+                    for tool_name in tools_config:
+                        if tool_name in docker_tool_map:
+                            task_tools.append(docker_tool_map[tool_name])
+                
+                # 知識検索ツールのチェック
+                if "knowledge_search" in tools_config:
+                    agent_tools.append(search_knowledge)
+                if "add_knowledge" in tools_config:
+                    agent_tools.append(add_knowledge_to_base)
+                
+                # その他のツール名をチェック（将来的に拡張可能）
+                for tool_name in tools_config:
+                    if isinstance(tool_name, str) and tool_name not in ["mcp", "docker", "knowledge_search", "add_knowledge"]:
+                        logger.warning(f"Unknown tool type", tool_name=tool_name)
+            
+            # 処理されたツールを設定
+            config["tools"] = task_tools
+            
+            # guardrailが文字列の場合は削除（後で処理）
+            guardrail_name = None
+            if "guardrail" in config and isinstance(config["guardrail"], str):
+                guardrail_name = config.pop("guardrail")
+            
+            # agentが文字列の場合は後で解決するために保存
+            agent_name = None
+            if "agent" in config and isinstance(config["agent"], str):
+                agent_name = config.pop("agent")
+            
+            # output_jsonが文字列の場合、対応するPydanticモデルに変換
+            if "output_json" in config and isinstance(config["output_json"], str):
+                if config["output_json"] == "EvolutionChanges":
+                    config["output_json"] = EvolutionChanges
             
             # すべての設定パラメータでタスクを作成
             logger.info("Task config used", task_name=task_name, config=truncate_dict(config))
             task = Task(**config)
             
+            # 一時的にエージェント名を保存
+            if agent_name:
+                task._agent_name = agent_name
+            
             # 後で解決するためにコンテキスト名を保存
             if context_names:
                 task._context_names = context_names
             
-            logger.info(f"Task created", description=task.description[:50])
+            logger.info(f"Task created", description=task.description[:50], tools=len(task_tools))
             return task
             
         except Exception as e:
@@ -244,6 +363,20 @@ class CrewFactory:
                     tasks.append(task)
                     task_map[task_name] = task
             
+            # エージェント名から実際のエージェントオブジェクトへのマッピングを作成
+            agent_map = {agent.role: agent for agent in agents}
+            
+            # タスクのエージェント解決（sequentialプロセスのみ）
+            if process == Process.sequential:
+                for task in tasks:
+                    if hasattr(task, '_agent_name'):
+                        agent = self.create_agent(task._agent_name)
+                        if agent:
+                            task.agent = agent
+                        else:
+                            logger.error(f"Agent not found for task", agent_name=task._agent_name)
+                        delattr(task, '_agent_name')
+            
             # タスクコンテキストの解決
             for task in tasks:
                 if hasattr(task, '_context_names'):
@@ -256,7 +389,6 @@ class CrewFactory:
                     if context_tasks:
                         task.context = context_tasks
                     delattr(task, '_context_names')
-            
             
             # 階層プロセス用のマネージャーの処理
             manager_llm = None
@@ -279,10 +411,31 @@ class CrewFactory:
             # エンベッダー設定の取得
             embedder_config = config.get("embedder", self.config.get_embedder_config())
             
+            # Knowledge sourcesの処理
+            knowledge_sources = []
+            if config.get("knowledge_sources"):
+                # 共有KnowledgeManagerインスタンスを使用
+                if self._knowledge_manager is None:
+                    self._knowledge_manager = KnowledgeManager(
+                        knowledge_dir=self.config.knowledge_dir,
+                        embedder_config=embedder_config
+                    )
+                
+                for source in config["knowledge_sources"]:
+                    self._knowledge_manager.add_crew_knowledge(source)
+                
+                # KnowledgeManagerからBaseKnowledgeSourceインスタンスを取得
+                knowledge_sources = self._knowledge_manager.crew_sources
+                logger.info(f"Processed knowledge sources", count=len(knowledge_sources))
+            
             # 処理された値で設定を更新
             config["agents"] = agents
             config["tasks"] = tasks
             config["process"] = process
+            
+            # knowledge_sourcesが存在する場合のみ追加
+            if knowledge_sources:
+                config["knowledge_sources"] = knowledge_sources
             
             # 指定されていない場合、デフォルト値を設定
             config.setdefault("name", crew_name)
@@ -301,8 +454,24 @@ class CrewFactory:
                 config["planning_llm"] = self.monica_llm
             
             # エンベッダー設定の処理
-            if config.get("memory_config", {}).get("provider") != "basic":
+            # memory_config.providerに関わらず、knowledge_sourcesがある場合は常にembedderを設定
+            if knowledge_sources or config.get("embedder"):
                 config["embedder"] = embedder_config
+            
+            # Evolution Crewの場合、コールバックを追加
+            if crew_name == "evolution_crew":
+                from evolution.evolution_callback import evolution_crew_callback, evolution_task_callback
+                
+                # Evolution設定から自動適用フラグを取得
+                evolution_config = self.crew_configs[crew_name].get("evolution_config", {})
+                auto_apply = evolution_config.get("auto_apply", False)
+                
+                # コールバックを設定
+                config["task_callback"] = evolution_task_callback
+                
+                logger.info("Evolution callbacks configured", 
+                          auto_apply=auto_apply,
+                          crew_name=crew_name)
             
             # すべての設定パラメータでクルーを作成
             logger.info("Crew config used", crew_name=crew_name, config=truncate_dict(config))
@@ -315,7 +484,8 @@ class CrewFactory:
                 name=crew.name,
                 agents=len(agents),
                 tasks=len(tasks),
-                process=process_str
+                process=process_str,
+                knowledge_sources=len(knowledge_sources)
             )
             
             return crew

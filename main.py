@@ -438,6 +438,48 @@ async def _trigger_evolution_analysis(task_id: str, task_result: Any, task_descr
 async def _apply_evolution_improvements(evolution_result: Any):
     """進化クルーが提案した改善を適用"""
     try:
+        # コールバックで処理された適応結果を確認
+        adaptive_evolution_data = None
+        if hasattr(evolution_result, 'json_dict') and evolution_result.json_dict:
+            adaptive_evolution_data = evolution_result.json_dict.get('adaptive_evolution')
+        
+        if adaptive_evolution_data:
+            # 自己適応型進化エンジンの結果を処理
+            app_logger.info(
+                "Processing adaptive evolution results",
+                has_trends=bool(adaptive_evolution_data.get('trends')),
+                has_adaptations=bool(adaptive_evolution_data.get('adaptations')),
+                has_dry_run=bool(adaptive_evolution_data.get('dry_run_results'))
+            )
+            
+            # 適応結果をimprovement_queueに記録
+            improvement_data = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "adaptive_evolution": adaptive_evolution_data,
+                "type": "adaptive",
+                "applied": adaptive_evolution_data.get('auto_apply', False)
+            }
+            
+            improvement_queue.append(improvement_data)
+            
+            # 適応結果のサマリーをログ
+            if 'adaptations' in adaptive_evolution_data:
+                adaptations = adaptive_evolution_data['adaptations']
+                app_logger.info(
+                    "Adaptive evolution completed",
+                    applied=len(adaptations.get('applied', [])),
+                    skipped=len(adaptations.get('skipped', [])),
+                    failed=len(adaptations.get('failed', []))
+                )
+            elif 'dry_run_results' in adaptive_evolution_data:
+                dry_run = adaptive_evolution_data['dry_run_results']
+                app_logger.info(
+                    "Adaptive evolution dry run completed",
+                    would_apply=len(dry_run.get('applied', [])),
+                    would_skip=len(dry_run.get('skipped', []))
+                )
+        
+        # 従来の改善処理も継続
         # 進化結果を解析
         if hasattr(evolution_result, 'raw'):
             result_text = evolution_result.raw

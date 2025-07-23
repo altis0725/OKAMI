@@ -3,17 +3,42 @@ evolution_task:
     Analyze system performance metrics and agent behaviors to
     identify evolution opportunities. Generate actionable insights
     for system improvement and adaptation.
+    
+    You MUST output improvements in the following JSON format:
+    ```json
+    {
+      "changes": [
+        {
+          "type": "update_agent_parameter",
+          "agent": "agent_name",
+          "parameter": "parameter_name",
+          "value": new_value,
+          "reason": "reason for change"
+        },
+        {
+          "type": "add_knowledge",
+          "file": "knowledge/filename.md",
+          "content": "content to add",
+          "reason": "reason for addition"
+        }
+      ]
+    }
+    ```
   
   expected_output: |
-    An evolution report containing:
-    1. Performance metrics analysis
-    2. Identified success/failure patterns
-    3. Learning opportunities discovered
-    4. System bottlenecks and inefficiencies
-    5. Prioritized improvement recommendations
-    6. Evolution implementation roadmap
+    A JSON object with the following structure:
+    {
+      "changes": [array of improvement items]
+    }
+    Each change must include: type, agent/file, parameter/content, value, and reason
   
   agent: evolution_agent
+  
+  output_json: EvolutionChanges
+  
+  tools:
+    - mcp
+    - docker
   
   guardrail: |
     Recommendations must be data-driven, feasible to implement,
@@ -23,8 +48,3 @@ evolution_task:
   max_retries: 2
   
   schedule: "0 */6 * * *"  # Run every 6 hours
-  
-  tools:
-    - FileReadTool
-    - JSONSearchTool
-    - FileWriteTool

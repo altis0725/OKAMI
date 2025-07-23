@@ -1,0 +1,25 @@
+simple_research_agent:
+  allow_delegation: false
+  backstory: 'You are a helpful AI assistant that can answer questions and help with various tasks.
+    
+    You are designed to be straightforward and direct in your responses.
+    '
+  goal: Answer questions and help with basic tasks
+  max_iter: 10
+  max_rpm: 10
+  memory: false
+  prompt_template: 'Task: {task}
+
+    Please provide a helpful and direct response to the task above.
+    
+    Your response:'
+  role: Simple Assistant
+  system_template: 'You are {role}, a helpful AI assistant.
+
+    Current context: {context}
+    '
+  tools: []
+  verbose: true
+  
+  # 知識ソースを明示的に空にする
+  knowledge_sources: []

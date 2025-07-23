@@ -8,7 +8,7 @@ validator_agent:
     all deliverables. You take pride in thorough verification and constructive feedback.
   
   verbose: true
-  memory: true
+  memory: false
   max_iter: 10
   allow_delegation: false
   
@@ -54,3 +54,7 @@ validator_agent:
     - Compliance with standards
     
     Your validation report:
+  
+  # エージェント用の知識ソース
+  # knowledge_sources:
+  #   - "knowledge/agents/validator_agent.md"

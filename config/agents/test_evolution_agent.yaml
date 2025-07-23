@@ -1,0 +1,6 @@
+test_evolution_agent:
+  backstory: Created by evolution system at 2025-07-20T15:55:35.899575
+  goal: Test the self-evolution system
+  memory: true
+  role: Evolution Test Agent
+  verbose: true

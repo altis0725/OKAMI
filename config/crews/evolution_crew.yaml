@@ -16,14 +16,15 @@ evolution_crew:
   cache: false  # Always fresh analysis
   verbose: true
   
-  knowledge_sources:
-    - "knowledge/evolution_strategies.txt"
-    - "knowledge/performance_baselines.txt"
+  # knowledge_sources:
+  #   - "knowledge/evolution_strategies.txt"
+  #   - "knowledge/performance_baselines.txt"
   
   embedder:
-    provider: "openai"
+    provider: "ollama"
     config:
-      model: "text-embedding-3-small"
+      model: "mxbai-embed-large"
+      url: "http://localhost:11434/api/embeddings"
   
   schedule:
     enabled: true

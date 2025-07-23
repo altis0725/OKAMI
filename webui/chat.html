@@ -61,6 +61,22 @@
             background-color: #2a2b32;
         }
         
+        .sidebar-btn {
+            flex: 1;
+            padding: 8px;
+            background-color: transparent;
+            border: 1px solid #565869;
+            color: #c5c5d2;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s;
+        }
+        
+        .sidebar-btn:hover {
+            background-color: #2a2b32;
+        }
+        
         .chat-history {
             flex: 1;
             overflow-y: auto;
@@ -73,10 +89,8 @@
             border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
             transition: background-color 0.2s;
+            position: relative;
         }
         
         .chat-history-item:hover {
@@ -240,6 +254,14 @@
             border-top: 1px solid #4d4d5e;
         }
         
+        .input-info {
+            max-width: 768px;
+            margin: 0 auto 8px;
+            font-size: 12px;
+            color: #8e8ea0;
+            text-align: right;
+        }
+        
         .input-wrapper {
             max-width: 768px;
             margin: 0 auto;
@@ -371,6 +393,18 @@
                     <span>➕</span>
                     <span>新しいチャット</span>
                 </button>
+                <div style="margin-top: 12px; display: flex; gap: 8px;">
+                    <button class="sidebar-btn" onclick="exportAllChats()" title="すべてのチャットをエクスポート">
+                        💾
+                    </button>
+                    <button class="sidebar-btn" onclick="importChats()" title="チャットをインポート">
+                        📁
+                    </button>
+                    <button class="sidebar-btn" onclick="clearAllChats()" title="すべてのチャットを削除">
+                        🗑️
+                    </button>
+                </div>
+                <input type="file" id="import-file" accept=".json" style="display: none;" onchange="handleImportFile(event)">
             </div>
             <div class="chat-history" id="chat-history">
                 <!-- 履歴アイテムが動的に追加される -->
@@ -380,6 +414,9 @@
         <main class="main-content">
             <header class="chat-header">
                 <h1 style="color: #ececf1; font-size: 20px; font-weight: 600;">🐺 OKAMI AI Assistant</h1>
+                <button class="model-selector" onclick="exportCurrentChat()" title="現在のチャットをエクスポート">
+                    💾 エクスポート
+                </button>
             </header>
             
             <div class="chat-messages" id="chat-messages">
@@ -387,6 +424,9 @@
             </div>
             
             <div class="input-container">
+                <div class="input-info">
+                    <span>日本語入力中はShift+Enterで送信</span>
+                </div>
                 <div class="input-wrapper">
                     <textarea 
                         class="chat-input" 
@@ -413,8 +453,19 @@
         // 初期化
         document.addEventListener('DOMContentLoaded', () => {
             const input = document.getElementById('chat-input');
+            // 日本語入力に対応したエンターキー処理
+            let isComposing = false;
+            
+            input.addEventListener('compositionstart', () => {
+                isComposing = true;
+            });
+            
+            input.addEventListener('compositionend', () => {
+                isComposing = false;
+            });
+            
             input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
+                if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
                     e.preventDefault();
                     sendMessage();
                 }
@@ -503,6 +554,7 @@
                 // チャットタイトルを更新（最初のメッセージの場合）
                 if (chats[currentChatId].messages.length === 2) {
                     chats[currentChatId].title = message.substring(0, 30) + (message.length > 30 ? '...' : '');
+                    chats[currentChatId].updatedAt = new Date().toISOString();
                     saveChats();
                     updateChatHistory();
                 }
@@ -555,7 +607,11 @@
             if (!chats[currentChatId].messages) {
                 chats[currentChatId].messages = [];
             }
-            chats[currentChatId].messages.push(message);
+            chats[currentChatId].messages.push({
+                ...message,
+                timestamp: new Date().toISOString()
+            });
+            chats[currentChatId].updatedAt = new Date().toISOString();
             saveChats();
             
             // スクロール
@@ -574,12 +630,32 @@
             avatarDiv.className = 'message-avatar';
             avatarDiv.textContent = message.role === 'user' ? 'U' : 'O';
             
+            const textWrapper = document.createElement('div');
+            textWrapper.style.flex = '1';
+            
             const textDiv = document.createElement('div');
             textDiv.className = 'message-text';
             textDiv.innerHTML = formatMessageContent(message.content);
             
+            // タイムスタンプを表示
+            if (message.timestamp) {
+                const timeDiv = document.createElement('div');
+                timeDiv.style.fontSize = '12px';
+                timeDiv.style.color = '#8e8ea0';
+                timeDiv.style.marginTop = '4px';
+                const date = new Date(message.timestamp);
+                timeDiv.textContent = date.toLocaleTimeString('ja-JP', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+                textWrapper.appendChild(textDiv);
+                textWrapper.appendChild(timeDiv);
+            } else {
+                textWrapper.appendChild(textDiv);
+            }
+            
             contentDiv.appendChild(avatarDiv);
-            contentDiv.appendChild(textDiv);
+            contentDiv.appendChild(textWrapper);
             messageDiv.appendChild(contentDiv);
             
             return messageDiv;
@@ -724,10 +800,67 @@
                 if (chat.id === currentChatId) {
                     item.className += ' active';
                 }
-                item.textContent = chat.title;
+                
+                // チャットアイテムのコンテナ
+                const itemContent = document.createElement('div');
+                itemContent.style.display = 'flex';
+                itemContent.style.justifyContent = 'space-between';
+                itemContent.style.alignItems = 'center';
+                itemContent.style.width = '100%';
+                
+                // タイトル
+                const titleSpan = document.createElement('span');
+                titleSpan.textContent = chat.title;
+                titleSpan.style.overflow = 'hidden';
+                titleSpan.style.textOverflow = 'ellipsis';
+                titleSpan.style.whiteSpace = 'nowrap';
+                
+                // 削除ボタン
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '×';
+                deleteBtn.style.background = 'none';
+                deleteBtn.style.border = 'none';
+                deleteBtn.style.color = '#c5c5d2';
+                deleteBtn.style.fontSize = '18px';
+                deleteBtn.style.cursor = 'pointer';
+                deleteBtn.style.padding = '0 4px';
+                deleteBtn.style.opacity = '0';
+                deleteBtn.style.transition = 'opacity 0.2s';
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    deleteChat(chat.id);
+                };
+                
+                itemContent.appendChild(titleSpan);
+                itemContent.appendChild(deleteBtn);
+                item.appendChild(itemContent);
+                
+                // ホバー時に削除ボタンを表示
+                item.onmouseenter = () => {
+                    deleteBtn.style.opacity = '1';
+                };
+                item.onmouseleave = () => {
+                    deleteBtn.style.opacity = '0';
+                };
+                
                 item.onclick = () => selectChat(chat.id);
                 historyContainer.appendChild(item);
             });
+        }
+        
+        // チャットを削除
+        function deleteChat(chatId) {
+            if (confirm('このチャットを削除してもよろしいですか？')) {
+                delete chats[chatId];
+                saveChats();
+                
+                // 削除したチャットが現在のチャットの場合、新しいチャットを作成
+                if (chatId === currentChatId) {
+                    newChat();
+                } else {
+                    updateChatHistory();
+                }
+            }
         }
         
         // 送信ボタンの状態を更新
@@ -749,13 +882,132 @@
         
         // チャットを保存
         function saveChats() {
-            localStorage.setItem('okami_chats', JSON.stringify(chats));
+            try {
+                // 保存サイズを制限（10MBまで）
+                const data = JSON.stringify(chats);
+                if (data.length > 10 * 1024 * 1024) {
+                    // 古いチャットを削除
+                    const sortedChats = Object.values(chats).sort((a, b) => 
+                        new Date(a.updatedAt || a.createdAt) - new Date(b.updatedAt || b.createdAt)
+                    );
+                    
+                    // 最も古いチャットを削除
+                    if (sortedChats.length > 1) {
+                        delete chats[sortedChats[0].id];
+                        saveChats(); // 再帰的に保存
+                        return;
+                    }
+                }
+                localStorage.setItem('okami_chats', data);
+            } catch (e) {
+                console.error('チャットの保存に失敗しました:', e);
+                alert('ストレージ容量が不足しています。古いチャットを削除してください。');
+            }
         }
         
         // チャットを読み込み
         function loadChats() {
-            const saved = localStorage.getItem('okami_chats');
-            return saved ? JSON.parse(saved) : {};
+            try {
+                const saved = localStorage.getItem('okami_chats');
+                return saved ? JSON.parse(saved) : {};
+            } catch (e) {
+                console.error('チャットの読み込みに失敗しました:', e);
+                return {};
+            }
+        }
+        
+        // すべてのチャットをエクスポート
+        function exportAllChats() {
+            const data = {
+                version: '1.0',
+                exportDate: new Date().toISOString(),
+                chats: chats
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `okami_chats_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        // 現在のチャットをエクスポート
+        function exportCurrentChat() {
+            const chat = chats[currentChatId];
+            if (!chat) return;
+            
+            const data = {
+                version: '1.0',
+                exportDate: new Date().toISOString(),
+                chat: chat
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `okami_chat_${chat.title.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        // チャットをインポート
+        function importChats() {
+            document.getElementById('import-file').click();
+        }
+        
+        // インポートファイルの処理
+        function handleImportFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    if (data.chats) {
+                        // 複数のチャットをインポート
+                        Object.keys(data.chats).forEach(chatId => {
+                            chats[chatId] = data.chats[chatId];
+                        });
+                    } else if (data.chat) {
+                        // 単一のチャットをインポート
+                        const newChatId = generateChatId();
+                        chats[newChatId] = {
+                            ...data.chat,
+                            id: newChatId,
+                            importedAt: new Date().toISOString()
+                        };
+                    }
+                    
+                    saveChats();
+                    updateChatHistory();
+                    alert('チャットをインポートしました。');
+                } catch (error) {
+                    console.error('インポートエラー:', error);
+                    alert('ファイルのインポートに失敗しました。');
+                }
+            };
+            reader.readAsText(file);
+            
+            // ファイル選択をリセット
+            event.target.value = '';
+        }
+        
+        // すべてのチャットを削除
+        function clearAllChats() {
+            if (confirm('本当にすべてのチャットを削除しますか？この操作は元に戻せません。')) {
+                chats = {};
+                saveChats();
+                newChat();
+            }
         }
     </script>
 </body>

@@ -4,7 +4,15 @@
 
 ## 概要
 
-OKAMIは、CrewAIをベースに構築された自己成長型AIエージェントシステムです。複数のエージェントが協調して作業を行い、経験から学習し、知識を蓄積・共有することで、時間とともにより賢く、効率的になっていきます。
+OKAMIは、CrewAI 0.140.0をベースに構築された自己成長型AIエージェントシステムです。複数のエージェントが協調して作業を行い、経験から学習し、知識を蓄積・共有することで、時間とともにより賢く、効率的になっていきます。
+
+### 🌟 主な特徴
+
+- **自己進化機能**: メインタスク完了後に自動的にEvolution Crewが分析・改善を実行
+- **階層型プロセス**: マネージャーエージェントによるインテリジェントなタスク委譲
+- **Qdrant知識管理**: ベクトル検索対応の高性能知識ベース
+- **リアルタイム監視**: Claude Code品質モニタリング統合
+- **マルチLLMサポート**: Monica LLM（GPT-4o互換）+ Ollama埋め込み
 
 ## ✅ 実装済み機能
 
@@ -41,11 +49,12 @@ OKAMIは、CrewAIをベースに構築された自己成長型AIエージェン�
 - **ログ集約**: Logstashによるログ処理（実装済み）
 - **バックアップ**: 自動バックアップスクリプト（実装済み）
 
-### 7. 🔄 自己進化システム ✅
+### 7. 🔄 自己進化システム ✅ ⚠️
 - **Evolution Crew**: メインタスク完了後の自動分析（実装済み）
 - **改善パーサー**: 分析結果から改善点を抽出（実装済み）
 - **自動適用**: 知識・設定ファイルへの自動更新（実装済み）
 - **バックアップ**: 変更前の自動バックアップ（実装済み）
+- **制約**: 現在Qdrant接続問題により、知識管理を含む高度な機能のテストが必要
 
 ## アーキテクチャ
 
@@ -83,30 +92,43 @@ OKAMI/
 - **CrewAI**: 0.140.0 (tools付き)
 - **FastAPI**: REST API
 - **Monica LLM**: GPT-4o互換API
-- **ChromaDB**: ベクトルストレージ
+- **Qdrant**: 高性能ベクトルストレージ
+- **Ollama**: ローカル埋め込みモデル（mxbai-embed-large）
+- **Mem0**: メモリ管理
 - **Docker**: コンテナ化
 - **Claude Code**: 外部監視
 - **structlog**: 構造化ログ
+- **NetworkX**: 知識グラフ
+- **SQLAlchemy**: データベースORM
 
 ## セットアップ
 
 ### 前提条件
 - Docker & Docker Compose
+- Ollama（ローカルで実行中）
+- Monica LLM API キー
 
 ### 手順
 
 ```bash
 # 1. 環境変数の設定
 cp .env.example .env
+# MONICA_API_KEY と MONICA_BASE_URL を設定
 
-# 2. Dockerコンテナの起動
+# 2. Ollama埋め込みモデルの準備
+ollama pull mxbai-embed-large
+
+# 3. Dockerコンテナの起動
 docker-compose up -d
 
-# 3. ヘルスチェック
+# 4. ヘルスチェック
 curl http://localhost:8000/health
 
-# 4. 利用可能なクルーの確認
+# 5. 利用可能なクルーの確認
 curl http://localhost:8000/crews
+
+# 6. Qdrant接続確認
+curl http://localhost:6333/collections
 ```
 
 ## 使用方法
@@ -189,22 +211,46 @@ mkdir -p nginx/ssl
 ./scripts/backup.sh
 ```
 
-## トラブルシューティング
+## 🚨 既知の問題と解決策
 
-### APIキーエラー
+### 1. Qdrant接続エラー
+**症状**: `[Errno 111] Connection refused in upsert.`
+
+**原因**: 
+- コンテナ間でのOllama接続設定の不一致
+- Qdrant知識管理の初期化エラー
+
+**解決策**:
 ```bash
-# SEACORの.envファイルを確認
+# 1. Ollamaの起動確認
+ollama list
+curl http://localhost:11434/api/tags
+
+# 2. Qdrantの状態確認
+docker-compose logs qdrant
+curl http://localhost:6333/health
+
+# 3. 知識管理を無効化してテスト
+# config/crews/simple_crew.yamlを使用
+curl -X POST http://localhost:8000/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"crew_name": "simple_crew", "task": "Hello World test", "async_execution": false}'
+```
+
+### 2. Evolution履歴が見つからない
+**症状**: `{"detail":"Not Found"}`
+
+**説明**: evolution_crewは正常にタスク完了後にトリガーされるため、まずmain_crewでタスクを正常実行する必要があります。
+
+### 3. APIキーエラー
+```bash
+# Monica APIキーの確認
 cat .env | grep MONICA_API_KEY
 ```
 
-### MCPツールエラー
-```bash
-# Docker MCP Gatewayの起動
-docker mcp gateway run
-```
-
-### メモリエラー
-- config/crews/main_crew.yamlで`memory_config.provider: "basic"`を確認
+### 4. メモリエラー
+- config/crews/main_crew.yamlで`memory_config.provider: "mem0"`を確認
+- Mem0 APIキーが必要な場合があります
 
 ## ライセンス
 

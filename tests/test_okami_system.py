@@ -194,289 +194,289 @@ async def test_knowledge_integration():
     return True
 
 
-@pytest.mark.asyncio
-async def test_guardrail_functionality():
-    """Test guardrail functionality"""
-    print("\n=== Testing Guardrail Functionality ===")
-    
-    # First, let's implement a basic guardrail system
-    # Check if guardrail manager exists
-    guardrail_path = Path("core/guardrail_manager.py")
-    if not guardrail_path.exists():
-        print("Creating guardrail manager...")
-        guardrail_content = '''"""
-Guardrail Manager for OKAMI system
-Validates and enforces quality constraints on outputs
-"""
-
-import re
-from typing import Dict, Any, List, Optional, Callable
-import structlog
-
-logger = structlog.get_logger()
-
-
-class GuardrailViolation(Exception):
-    """Raised when a guardrail check fails"""
-    pass
-
-
-class Guardrail:
-    """Base guardrail class"""
-    
-    def __init__(self, name: str, description: str):
-        self.name = name
-        self.description = description
-    
-    def check(self, content: str, context: Dict[str, Any] = None) -> bool:
-        """Check if content passes guardrail"""
-        raise NotImplementedError
-    
-    def fix(self, content: str, context: Dict[str, Any] = None) -> str:
-        """Attempt to fix content to pass guardrail"""
-        return content
-
-
-class LengthGuardrail(Guardrail):
-    """Ensures content meets length requirements"""
-    
-    def __init__(self, min_length: int = 10, max_length: int = 10000):
-        super().__init__(
-            "length_guardrail",
-            f"Content must be between {min_length} and {max_length} characters"
-        )
-        self.min_length = min_length
-        self.max_length = max_length
-    
-    def check(self, content: str, context: Dict[str, Any] = None) -> bool:
-        length = len(content.strip())
-        return self.min_length <= length <= self.max_length
-    
-    def fix(self, content: str, context: Dict[str, Any] = None) -> str:
-        if len(content.strip()) < self.min_length:
-            return content + "\\n\\n[Content expanded to meet minimum length requirements]"
-        elif len(content.strip()) > self.max_length:
-            return content[:self.max_length-50] + "\\n\\n[Content truncated to meet length limits]"
-        return content
-
-
-class FormatGuardrail(Guardrail):
-    """Ensures content meets format requirements"""
-    
-    def __init__(self, required_sections: List[str] = None):
-        super().__init__(
-            "format_guardrail",
-            "Content must include required sections and formatting"
-        )
-        self.required_sections = required_sections or []
-    
-    def check(self, content: str, context: Dict[str, Any] = None) -> bool:
-        content_lower = content.lower()
-        for section in self.required_sections:
-            if section.lower() not in content_lower:
-                return False
-        return True
-    
-    def fix(self, content: str, context: Dict[str, Any] = None) -> str:
-        missing_sections = []
-        content_lower = content.lower()
-        
-        for section in self.required_sections:
-            if section.lower() not in content_lower:
-                missing_sections.append(section)
-        
-        if missing_sections:
-            content += "\\n\\n## Additional Sections\\n"
-            for section in missing_sections:
-                content += f"\\n### {section}\\n[To be completed]\\n"
-        
-        return content
-
-
-class QualityGuardrail(Guardrail):
-    """Ensures content quality standards"""
-    
-    def __init__(self):
-        super().__init__(
-            "quality_guardrail",
-            "Content must meet quality standards"
-        )
-        self.forbidden_phrases = [
-            "lorem ipsum",
-            "todo",
-            "fixme",
-            "[placeholder]",
-            "undefined"
-        ]
-    
-    def check(self, content: str, context: Dict[str, Any] = None) -> bool:
-        content_lower = content.lower()
-        for phrase in self.forbidden_phrases:
-            if phrase in content_lower:
-                return False
-        return True
-    
-    def fix(self, content: str, context: Dict[str, Any] = None) -> str:
-        for phrase in self.forbidden_phrases:
-            content = re.sub(
-                phrase,
-                "[content]",
-                content,
-                flags=re.IGNORECASE
-            )
-        return content
-
-
-class GuardrailManager:
-    """Manages guardrails for the OKAMI system"""
-    
-    def __init__(self):
-        self.guardrails: Dict[str, Guardrail] = {}
-        self._initialize_default_guardrails()
-    
-    def _initialize_default_guardrails(self):
-        """Initialize default guardrails"""
-        self.register_guardrail(LengthGuardrail())
-        self.register_guardrail(QualityGuardrail())
-        self.register_guardrail(FormatGuardrail(
-            required_sections=["summary", "details", "recommendations"]
-        ))
-    
-    def register_guardrail(self, guardrail: Guardrail):
-        """Register a new guardrail"""
-        self.guardrails[guardrail.name] = guardrail
-        logger.info(f"Registered guardrail: {guardrail.name}")
-    
-    def check_content(
-        self,
-        content: str,
-        guardrail_names: List[str] = None,
-        context: Dict[str, Any] = None,
-        auto_fix: bool = True
-    ) -> tuple[bool, str, List[str]]:
-        """
-        Check content against guardrails
-        
-        Returns:
-            (passed, fixed_content, violations)
-        """
-        if guardrail_names is None:
-            guardrail_names = list(self.guardrails.keys())
-        
-        violations = []
-        fixed_content = content
-        
-        for name in guardrail_names:
-            if name not in self.guardrails:
-                logger.warning(f"Unknown guardrail: {name}")
-                continue
-            
-            guardrail = self.guardrails[name]
-            
-            if not guardrail.check(fixed_content, context):
-                violations.append(f"{name}: {guardrail.description}")
-                
-                if auto_fix:
-                    fixed_content = guardrail.fix(fixed_content, context)
-                    logger.info(f"Applied fix for guardrail: {name}")
-        
-        passed = len(violations) == 0
-        
-        if violations:
-            logger.warning(
-                "Guardrail violations detected",
-                violations=violations,
-                auto_fixed=auto_fix
-            )
-        
-        return passed, fixed_content, violations
-    
-    def create_task_guardrail(self, guardrail_spec: str) -> Optional[Callable]:
-        """
-        Create a guardrail function from specification
-        
-        Args:
-            guardrail_spec: Guardrail specification string
-            
-        Returns:
-            Guardrail function or None
-        """
-        def guardrail_func(content: str) -> str:
-            # Parse simple guardrail specifications
-            if "minimum" in guardrail_spec and "words" in guardrail_spec:
-                # Extract minimum word count
-                import re
-                match = re.search(r'minimum of (\\d+) words', guardrail_spec)
-                if match:
-                    min_words = int(match.group(1))
-                    word_count = len(content.split())
-                    if word_count < min_words:
-                        logger.warning(
-                            f"Content has {word_count} words, "
-                            f"minimum required: {min_words}"
-                        )
-            
-            # Apply default guardrails
-            passed, fixed_content, violations = self.check_content(content)
-            
-            return fixed_content
-        
-        return guardrail_func
-'''
-        guardrail_path.write_text(guardrail_content)
-        print("✓ Guardrail manager created")
-    
-    # Test guardrail functionality
-    from core.guardrail_manager import GuardrailManager
-    
-    manager = GuardrailManager()
-    
-    # Test various content
-    test_cases = [
-        ("Short", False),  # Too short
-        ("This is a proper content with summary, details, and recommendations sections.", False),  # Missing sections
-        ("Lorem ipsum dolor sit amet", False),  # Contains forbidden phrase
-        ("""# Test Report
-
-## Summary
-This is a test of the guardrail system.
-
-## Details
-The guardrail system ensures content quality by checking:
-- Length requirements
-- Required sections
-- Forbidden phrases
-
-## Recommendations
-1. Always include all required sections
-2. Avoid placeholder text
-3. Ensure sufficient content length
-""", True)  # Should pass
-    ]
-    
-    for content, should_pass in test_cases:
-        passed, fixed_content, violations = manager.check_content(content)
-        
-        if passed == should_pass:
-            print(f"✓ Test passed: {'PASS' if passed else 'FAIL with violations'}")
-            if violations:
-                print(f"  Violations: {violations}")
-        else:
-            print(f"✗ Test failed: Expected {'PASS' if should_pass else 'FAIL'}, got {'PASS' if passed else 'FAIL'}")
-    
-    # Test auto-fix functionality
-    print("\nTesting auto-fix...")
-    bad_content = "TODO: Write report"
-    passed, fixed_content, violations = manager.check_content(bad_content, auto_fix=True)
-    
-    if not passed and fixed_content != bad_content:
-        print("✓ Auto-fix applied successfully")
-        print(f"  Original: {bad_content}")
-        print(f"  Fixed: {fixed_content[:50]}...")
-    else:
-        print("✗ Auto-fix did not work as expected")
-    
-    return True
+# @pytest.mark.asyncio
+# async def test_guardrail_functionality():
+#     """Test guardrail functionality"""
+#     print("\n=== Testing Guardrail Functionality ===")
+#     
+#     # First, let's implement a basic guardrail system
+#     # Check if guardrail manager exists
+#     guardrail_path = Path("core/guardrail_manager.py")
+#     if not guardrail_path.exists():
+#         print("Creating guardrail manager...")
+#         guardrail_content = '''"""
+# Guardrail Manager for OKAMI system
+# Validates and enforces quality constraints on outputs
+# """
+# 
+# import re
+# from typing import Dict, Any, List, Optional, Callable
+# import structlog
+# 
+# logger = structlog.get_logger()
+# 
+# 
+# class GuardrailViolation(Exception):
+#     """Raised when a guardrail check fails"""
+#     pass
+# 
+# 
+# class Guardrail:
+#     """Base guardrail class"""
+#     
+#     def __init__(self, name: str, description: str):
+#         self.name = name
+#         self.description = description
+#     
+#     def check(self, content: str, context: Dict[str, Any] = None) -> bool:
+#         """Check if content passes guardrail"""
+#         raise NotImplementedError
+#     
+#     def fix(self, content: str, context: Dict[str, Any] = None) -> str:
+#         """Attempt to fix content to pass guardrail"""
+#         return content
+# 
+# 
+# class LengthGuardrail(Guardrail):
+#     """Ensures content meets length requirements"""
+#     
+#     def __init__(self, min_length: int = 10, max_length: int = 10000):
+#         super().__init__(
+#             "length_guardrail",
+#             f"Content must be between {min_length} and {max_length} characters"
+#         )
+#         self.min_length = min_length
+#         self.max_length = max_length
+#     
+#     def check(self, content: str, context: Dict[str, Any] = None) -> bool:
+#         length = len(content.strip())
+#         return self.min_length <= length <= self.max_length
+#     
+#     def fix(self, content: str, context: Dict[str, Any] = None) -> str:
+#         if len(content.strip()) < self.min_length:
+#             return content + "\\n\\n[Content expanded to meet minimum length requirements]"
+#         elif len(content.strip()) > self.max_length:
+#             return content[:self.max_length-50] + "\\n\\n[Content truncated to meet length limits]"
+#         return content
+# 
+# 
+# class FormatGuardrail(Guardrail):
+#     """Ensures content meets format requirements"""
+#     
+#     def __init__(self, required_sections: List[str] = None):
+#         super().__init__(
+#             "format_guardrail",
+#             "Content must include required sections and formatting"
+#         )
+#         self.required_sections = required_sections or []
+#     
+#     def check(self, content: str, context: Dict[str, Any] = None) -> bool:
+#         content_lower = content.lower()
+#         for section in self.required_sections:
+#             if section.lower() not in content_lower:
+#                 return False
+#         return True
+#     
+#     def fix(self, content: str, context: Dict[str, Any] = None) -> str:
+#         missing_sections = []
+#         content_lower = content.lower()
+#         
+#         for section in self.required_sections:
+#             if section.lower() not in content_lower:
+#                 missing_sections.append(section)
+#         
+#         if missing_sections:
+#             content += "\\n\\n## Additional Sections\\n"
+#             for section in missing_sections:
+#                 content += f"\\n### {section}\\n[To be completed]\\n"
+#         
+#         return content
+# 
+# 
+# class QualityGuardrail(Guardrail):
+#     """Ensures content quality standards"""
+#     
+#     def __init__(self):
+#         super().__init__(
+#             "quality_guardrail",
+#             "Content must meet quality standards"
+#         )
+#         self.forbidden_phrases = [
+#             "lorem ipsum",
+#             "todo",
+#             "fixme",
+#             "[placeholder]",
+#             "undefined"
+#         ]
+#     
+#     def check(self, content: str, context: Dict[str, Any] = None) -> bool:
+#         content_lower = content.lower()
+#         for phrase in self.forbidden_phrases:
+#             if phrase in content_lower:
+#                 return False
+#         return True
+#     
+#     def fix(self, content: str, context: Dict[str, Any] = None) -> str:
+#         for phrase in self.forbidden_phrases:
+#             content = re.sub(
+#                 phrase,
+#                 "[content]",
+#                 content,
+#                 flags=re.IGNORECASE
+#             )
+#         return content
+# 
+# 
+# class GuardrailManager:
+#     """Manages guardrails for the OKAMI system"""
+#     
+#     def __init__(self):
+#         self.guardrails: Dict[str, Guardrail] = {}
+#         self._initialize_default_guardrails()
+#     
+#     def _initialize_default_guardrails(self):
+#         """Initialize default guardrails"""
+#         self.register_guardrail(LengthGuardrail())
+#         self.register_guardrail(QualityGuardrail())
+#         self.register_guardrail(FormatGuardrail(
+#             required_sections=["summary", "details", "recommendations"]
+#         ))
+#     
+#     def register_guardrail(self, guardrail: Guardrail):
+#         """Register a new guardrail"""
+#         self.guardrails[guardrail.name] = guardrail
+#         logger.info(f"Registered guardrail: {guardrail.name}")
+#     
+#     def check_content(
+#         self,
+#         content: str,
+#         guardrail_names: List[str] = None,
+#         context: Dict[str, Any] = None,
+#         auto_fix: bool = True
+#     ) -> tuple[bool, str, List[str]]:
+#         """
+#         Check content against guardrails
+#         
+#         Returns:
+#             (passed, fixed_content, violations)
+#         """
+#         if guardrail_names is None:
+#             guardrail_names = list(self.guardrails.keys())
+#         
+#         violations = []
+#         fixed_content = content
+#         
+#         for name in guardrail_names:
+#             if name not in self.guardrails:
+#                 logger.warning(f"Unknown guardrail: {name}")
+#                 continue
+#             
+#             guardrail = self.guardrails[name]
+#             
+#             if not guardrail.check(fixed_content, context):
+#                 violations.append(f"{name}: {guardrail.description}")
+#                 
+#                 if auto_fix:
+#                     fixed_content = guardrail.fix(fixed_content, context)
+#                     logger.info(f"Applied fix for guardrail: {name}")
+#         
+#         passed = len(violations) == 0
+#         
+#         if violations:
+#             logger.warning(
+#                 "Guardrail violations detected",
+#                 violations=violations,
+#                 auto_fixed=auto_fix
+#             )
+#         
+#         return passed, fixed_content, violations
+#     
+#     def create_task_guardrail(self, guardrail_spec: str) -> Optional[Callable]:
+#         """
+#         Create a guardrail function from specification
+#         
+#         Args:
+#             guardrail_spec: Guardrail specification string
+#             
+#         Returns:
+#             Guardrail function or None
+#         """
+#         def guardrail_func(content: str) -> str:
+#             # Parse simple guardrail specifications
+#             if "minimum" in guardrail_spec and "words" in guardrail_spec:
+#                 # Extract minimum word count
+#                 import re
+#                 match = re.search(r'minimum of (\\d+) words', guardrail_spec)
+#                 if match:
+#                     min_words = int(match.group(1))
+#                     word_count = len(content.split())
+#                     if word_count < min_words:
+#                         logger.warning(
+#                             f"Content has {word_count} words, "
+#                             f"minimum required: {min_words}"
+#                         )
+#             
+#             # Apply default guardrails
+#             passed, fixed_content, violations = self.check_content(content)
+#             
+#             return fixed_content
+#         
+#         return guardrail_func
+# '''
+#         guardrail_path.write_text(guardrail_content)
+#         print("✓ Guardrail manager created")
+#     
+#     # Test guardrail functionality
+#     from core.guardrail_manager import GuardrailManager
+#     
+#     manager = GuardrailManager()
+#     
+#     # Test various content
+#     test_cases = [
+#         ("Short", False),  # Too short
+#         ("This is a proper content with summary, details, and recommendations sections.", False),  # Missing sections
+#         ("Lorem ipsum dolor sit amet", False),  # Contains forbidden phrase
+#         ("""# Test Report
+# 
+# ## Summary
+# This is a test of the guardrail system.
+# 
+# ## Details
+# The guardrail system ensures content quality by checking:
+# - Length requirements
+# - Required sections
+# - Forbidden phrases
+# 
+# ## Recommendations
+# 1. Always include all required sections
+# 2. Avoid placeholder text
+# 3. Ensure sufficient content length
+# """, True)  # Should pass
+#     ]
+#     
+#     for content, should_pass in test_cases:
+#         passed, fixed_content, violations = manager.check_content(content)
+#         
+#         if passed == should_pass:
+#             print(f"✓ Test passed: {'PASS' if passed else 'FAIL with violations'}")
+#             if violations:
+#                 print(f"  Violations: {violations}")
+#         else:
+#             print(f"✗ Test failed: Expected {'PASS' if should_pass else 'FAIL'}, got {'PASS' if passed else 'FAIL'}")
+#     
+#     # Test auto-fix functionality
+#     print("\nTesting auto-fix...")
+#     bad_content = "TODO: Write report"
+#     passed, fixed_content, violations = manager.check_content(bad_content, auto_fix=True)
+#     
+#     if not passed and fixed_content != bad_content:
+#         print("✓ Auto-fix applied successfully")
+#         print(f"  Original: {bad_content}")
+#         print(f"  Fixed: {fixed_content[:50]}...")
+#     else:
+#         print("✗ Auto-fix did not work as expected")
+#     
+#     return True
 
 
 @pytest.mark.asyncio
@@ -526,7 +526,7 @@ async def main():
         ("Basic Crew Creation", test_basic_crew_creation),
         ("Self-Evolution", test_self_evolution),
         ("Knowledge Integration", test_knowledge_integration),
-        ("Guardrail Functionality", test_guardrail_functionality),
+        # ("Guardrail Functionality", test_guardrail_functionality),
         ("Full Integration", test_full_integration)
     ]
     

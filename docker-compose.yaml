@@ -12,12 +12,29 @@ services:
       - ./knowledge:/app/knowledge
     environment:
       - PYTHONUNBUFFERED=1
-      - CREWAI_STORAGE_DIR=/app/storage
+      - CREWAI_STORAGE_DIR=/tmp/crewai_storage
+      - CREWAI_DISABLE_TELEMETRY=true
+      - OTEL_SDK_DISABLED=true
       - LOG_LEVEL=INFO
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - EMBEDDER_PROVIDER=ollama
+      - EMBEDDER_MODEL=mxbai-embed-large
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_GRPC_PORT=6334
+      - VECTOR_STORE_TYPE=qdrant
+      - USE_QDRANT=true  # Qdrant知識管理を無効化
+      # CrewAI知識ベース用の設定
+      - CREWAI__EMBEDDINGS__PROVIDER=ollama
+      - CREWAI__EMBEDDINGS__MODEL=mxbai-embed-large
+      - CREWAI__EMBEDDINGS__BASE_URL=http://host.docker.internal:11434
     env_file:
       - .env
     networks:
       - okami-network
+    depends_on:
+      - qdrant
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -48,23 +65,51 @@ services:
       - okami-network
     restart: unless-stopped
 
-  # ChromaDB for vector storage
-  chromadb:
-    image: chromadb/chroma:latest
-    container_name: okami-chromadb
+  # Qdrant for vector storage
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: okami-qdrant
     ports:
-      - "8001:8000"
+      - "6333:6333"
+      - "6334:6334"  # gRPC port
     volumes:
-      - chroma-data:/chroma/chroma
+      - qdrant-data:/qdrant/storage
     environment:
-      - IS_PERSISTENT=TRUE
-      - ANONYMIZED_TELEMETRY=FALSE
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__LOG_LEVEL=INFO
     networks:
       - okami-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Ollama for local embeddings - ホストのOllamaを使用するためコメントアウト
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: okami-ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama-data:/root/.ollama
+  #   environment:
+  #     - OLLAMA_HOST=0.0.0.0
+  #   networks:
+  #     - okami-network
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #     start_period: 120s
 
 volumes:
-  chroma-data:
+  qdrant-data:
 
 networks:
   okami-network:

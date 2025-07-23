@@ -8,7 +8,7 @@ writer_agent:
     ideas clearly, engage audiences effectively, and achieve their communication goals.
   
   verbose: true
-  memory: true
+  memory: false
   max_iter: 15
   allow_delegation: false
   
@@ -54,3 +54,7 @@ writer_agent:
     - Call to action (if applicable)
     
     Your content:
+  
+  # エージェント用の知識ソース
+  # knowledge_sources:
+  #   - "knowledge/agents/writer_agent.md"
