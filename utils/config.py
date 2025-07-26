@@ -45,10 +45,10 @@ class OkamiConfig(BaseSettings):
     chroma_port: int = Field(default=8001, env="CHROMA_PORT")
     
     # Vector Store Settings
-    vector_store_type: str = Field(default="qdrant", env="VECTOR_STORE_TYPE")
-    qdrant_host: str = Field(default="localhost", env="QDRANT_HOST")
-    qdrant_port: int = Field(default=6333, env="QDRANT_PORT")
-    qdrant_grpc_port: int = Field(default=6334, env="QDRANT_GRPC_PORT")
+    vector_store_type: str = Field(default="chroma", env="VECTOR_STORE_TYPE")
+    # qdrant_host: str = Field(default="localhost", env="QDRANT_HOST")
+    # qdrant_port: int = Field(default=6333, env="QDRANT_PORT")
+    # qdrant_grpc_port: int = Field(default=6334, env="QDRANT_GRPC_PORT")
 
     # Prometheus Settings
     prometheus_host: str = Field(default="localhost", env="PROMETHEUS_HOST")

@@ -4,6 +4,10 @@ evolution_task:
     identify evolution opportunities. Generate actionable insights
     for system improvement and adaptation.
     
+    User Input: {user_input}
+    
+    Main Crew Response: {main_response}
+    
     You MUST output improvements in the following JSON format:
     ```json
     {
@@ -36,9 +40,9 @@ evolution_task:
   
   output_json: EvolutionChanges
   
-  tools:
-    - mcp
-    - docker
+  # tools:
+  #   - mcp
+  #   - docker
   
   guardrail: |
     Recommendations must be data-driven, feasible to implement,

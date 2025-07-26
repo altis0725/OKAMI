@@ -11,11 +11,13 @@ evolution_agent:
   memory: false
   max_iter: 20
   allow_delegation: false
-  
+  knowledge_sources: []
   tools:
     - mcp
     - docker
   
+
+
   system_template: |
     You are {role}, an evolution specialist in the OKAMI system.
     

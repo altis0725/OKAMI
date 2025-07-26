@@ -7,6 +7,9 @@ main_task:
     3. Constructing appropriate responses in the correct format
     4. Ensuring output quality and accuracy
     5. Delivering the exact value the user is seeking
+    
+    The user input is as follows:
+    {task}
   expected_output: |
     Accurate and complete response to the input that meets the following criteria:
     - Information accuracy is guaranteed

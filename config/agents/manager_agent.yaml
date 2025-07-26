@@ -12,6 +12,7 @@ manager_agent:
   max_iter: 25
   allow_delegation: false
   reasoning: true
+  knowledge_sources: []
   # Manager agents should not have tools in hierarchical process
   # tools:
   #   - mcp

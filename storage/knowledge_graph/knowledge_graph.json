@@ -1,0 +1,240 @@
+{
+  "directed": true,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "title": "Research Agent Best Practices",
+      "content": "Research agents should verify information from multiple sources and provide citations.",
+      "node_type": "procedure",
+      "created_at": "2025-07-24T02:00:34.794959",
+      "updated_at": "2025-07-24T02:00:34.794960",
+      "metadata": {
+        "agent": "research_agent",
+        "category": "best_practice"
+      },
+      "file_path": "storage/knowledge_graph/knowledge_files/agent_research_001.md",
+      "id": "agent_research_001"
+    },
+    {
+      "title": "Writer Agent Guidelines",
+      "content": "Writer agents should structure content clearly and use appropriate language for the target audience.",
+      "node_type": "procedure",
+      "created_at": "2025-07-24T02:00:34.794971",
+      "updated_at": "2025-07-24T02:00:34.794971",
+      "metadata": {
+        "agent": "writer_agent",
+        "category": "guideline"
+      },
+      "file_path": "storage/knowledge_graph/knowledge_files/agent_writer_001.md",
+      "id": "agent_writer_001"
+    },
+    {
+      "title": "Crew Collaboration Concept",
+      "content": "Crews work best when agents have complementary skills and clear communication protocols.",
+      "node_type": "concept",
+      "created_at": "2025-07-24T02:00:34.794974",
+      "updated_at": "2025-07-24T02:00:34.794974",
+      "metadata": {
+        "scope": "crew",
+        "category": "concept"
+      },
+      "file_path": "storage/knowledge_graph/knowledge_files/concept_crew_001.md",
+      "id": "concept_crew_001"
+    },
+    {
+      "title": "Performance Optimization Facts",
+      "content": "Tasks taking over 30 seconds often indicate inefficient tool usage or overly broad task descriptions.",
+      "node_type": "fact",
+      "created_at": "2025-07-24T02:00:34.794976",
+      "updated_at": "2025-07-24T02:00:34.794977",
+      "metadata": {
+        "category": "performance",
+        "threshold": 30
+      },
+      "file_path": "storage/knowledge_graph/knowledge_files/fact_performance_001.md",
+      "id": "fact_performance_001"
+    },
+    {
+      "title": "Improvement for research_agent",
+      "content": "Agent research_agent needs improvement. Success rate: 20.0%\n\nActions:\n- Review and enhance agent's goal and backstory\n- Add more specific tools or knowledge sources\n- Consider breaking complex tasks into smaller subtasks",
+      "node_type": "improvement",
+      "created_at": "2025-07-24T02:00:34.798832",
+      "updated_at": "2025-07-24T02:00:34.798833",
+      "metadata": {
+        "agent_role": "research_agent",
+        "priority": "high",
+        "type": "skill_improvement"
+      },
+      "file_path": "storage/knowledge_graph/knowledge_files/improvement_research_agent_000.md",
+      "id": "improvement_research_agent_000"
+    },
+    {
+      "title": "Improvement for research_agent",
+      "content": "Agent research_agent has slow execution time: 59.0s average\n\nActions:\n- Optimize task descriptions to be more specific\n- Review and optimize tool usage\n- Consider caching frequently accessed data",
+      "node_type": "improvement",
+      "created_at": "2025-07-24T02:00:34.799432",
+      "updated_at": "2025-07-24T02:00:34.799433",
+      "metadata": {
+        "agent_role": "research_agent",
+        "priority": "medium",
+        "type": "performance_optimization"
+      },
+      "file_path": "storage/knowledge_graph/knowledge_files/improvement_research_agent_001.md",
+      "id": "improvement_research_agent_001"
+    },
+    {
+      "title": "Improvement for writer_agent",
+      "content": "Agent writer_agent needs improvement. Success rate: 22.2%\n\nActions:\n- Review and enhance agent's goal and backstory\n- Add more specific tools or knowledge sources\n- Consider breaking complex tasks into smaller subtasks",
+      "node_type": "improvement",
+      "created_at": "2025-07-24T02:00:34.799997",
+      "updated_at": "2025-07-24T02:00:34.799997",
+      "metadata": {
+        "agent_role": "writer_agent",
+        "priority": "high",
+        "type": "skill_improvement"
+      },
+      "file_path": "storage/knowledge_graph/knowledge_files/improvement_writer_agent_002.md",
+      "id": "improvement_writer_agent_002"
+    },
+    {
+      "title": "Performance Improvement: skill_improvement",
+      "content": "Agent research_agent needs improvement. Success rate: 20.0%\n\nRecommended Actions:\n- Review and enhance agent's goal and backstory\n- Add more specific tools or knowledge sources\n- Consider breaking complex tasks into smaller subtasks",
+      "node_type": "improvement",
+      "created_at": "2025-07-24T02:01:46.304533",
+      "updated_at": "2025-07-24T02:01:46.304533",
+      "metadata": {
+        "agent_role": "research_agent",
+        "priority": "high",
+        "improvement_type": "skill_improvement",
+        "source": "evolution_tracker",
+        "applied_to_files": true
+      },
+      "file_path": "storage/knowledge_graph/knowledge_files/improvement_research_agent_20250724_020146_0.md",
+      "id": "improvement_research_agent_20250724_020146_0"
+    },
+    {
+      "title": "Performance Improvement: performance_optimization",
+      "content": "Agent research_agent has slow execution time: 59.0s average\n\nRecommended Actions:\n- Optimize task descriptions to be more specific\n- Review and optimize tool usage\n- Consider caching frequently accessed data",
+      "node_type": "improvement",
+      "created_at": "2025-07-24T02:01:46.304561",
+      "updated_at": "2025-07-24T02:01:46.304561",
+      "metadata": {
+        "agent_role": "research_agent",
+        "priority": "medium",
+        "improvement_type": "performance_optimization",
+        "source": "evolution_tracker",
+        "applied_to_files": true
+      },
+      "file_path": "storage/knowledge_graph/knowledge_files/improvement_research_agent_20250724_020146_1.md",
+      "id": "improvement_research_agent_20250724_020146_1"
+    },
+    {
+      "title": "Performance Improvement: skill_improvement",
+      "content": "Agent writer_agent needs improvement. Success rate: 22.2%\n\nRecommended Actions:\n- Review and enhance agent's goal and backstory\n- Add more specific tools or knowledge sources\n- Consider breaking complex tasks into smaller subtasks",
+      "node_type": "improvement",
+      "created_at": "2025-07-24T02:01:46.304573",
+      "updated_at": "2025-07-24T02:01:46.304574",
+      "metadata": {
+        "agent_role": "writer_agent",
+        "priority": "high",
+        "improvement_type": "skill_improvement",
+        "source": "evolution_tracker",
+        "applied_to_files": true
+      },
+      "file_path": "storage/knowledge_graph/knowledge_files/improvement_writer_agent_20250724_020146_2.md",
+      "id": "improvement_writer_agent_20250724_020146_2"
+    },
+    {
+      "title": "Performance Improvement: performance_optimization",
+      "content": "Agent writer_agent has slow execution time: 66.6s average\n\nRecommended Actions:\n- Optimize task descriptions to be more specific\n- Review and optimize tool usage\n- Consider caching frequently accessed data",
+      "node_type": "improvement",
+      "created_at": "2025-07-24T02:01:46.304582",
+      "updated_at": "2025-07-24T02:01:46.304583",
+      "metadata": {
+        "agent_role": "writer_agent",
+        "priority": "medium",
+        "improvement_type": "performance_optimization",
+        "source": "evolution_tracker",
+        "applied_to_files": true
+      },
+      "file_path": "storage/knowledge_graph/knowledge_files/improvement_writer_agent_20250724_020146_3.md",
+      "id": "improvement_writer_agent_20250724_020146_3"
+    },
+    {
+      "title": "Performance Improvement: system_improvement",
+      "content": "Overall system success rate needs improvement: 24.0%\n\nRecommended Actions:\n- Implement better error handling and retry mechanisms\n- Add validation steps between agent handoffs\n- Consider adding a supervisor agent for complex workflows",
+      "node_type": "improvement",
+      "created_at": "2025-07-24T02:01:46.304592",
+      "updated_at": "2025-07-24T02:01:46.304592",
+      "metadata": {
+        "agent_role": "system",
+        "priority": "high",
+        "improvement_type": "system_improvement",
+        "source": "evolution_tracker",
+        "applied_to_files": true
+      },
+      "file_path": "storage/knowledge_graph/knowledge_files/improvement_system_20250724_020146_4.md",
+      "id": "improvement_system_20250724_020146_4"
+    }
+  ],
+  "links": [
+    {
+      "relation_type": "contributes_to",
+      "weight": 0.8,
+      "metadata": {
+        "description": "Research quality contributes to crew success"
+      },
+      "source": "agent_research_001",
+      "target": "concept_crew_001"
+    },
+    {
+      "relation_type": "contributes_to",
+      "weight": 0.8,
+      "metadata": {
+        "description": "Clear writing contributes to crew communication"
+      },
+      "source": "agent_writer_001",
+      "target": "concept_crew_001"
+    },
+    {
+      "relation_type": "applies_to",
+      "weight": 0.9,
+      "metadata": {
+        "description": "Performance facts apply to research tasks"
+      },
+      "source": "fact_performance_001",
+      "target": "agent_research_001"
+    },
+    {
+      "relation_type": "applies_to",
+      "weight": 0.9,
+      "metadata": {
+        "description": "Performance facts apply to writing tasks"
+      },
+      "source": "fact_performance_001",
+      "target": "agent_writer_001"
+    },
+    {
+      "relation_type": "improves",
+      "weight": 0.95,
+      "metadata": {},
+      "source": "improvement_research_agent_000",
+      "target": "agent_research_001"
+    },
+    {
+      "relation_type": "improves",
+      "weight": 0.95,
+      "metadata": {},
+      "source": "improvement_research_agent_001",
+      "target": "agent_research_001"
+    },
+    {
+      "relation_type": "improves",
+      "weight": 0.95,
+      "metadata": {},
+      "source": "improvement_writer_agent_002",
+      "target": "agent_writer_001"
+    }
+  ]
+}

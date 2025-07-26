@@ -1,0 +1,67 @@
+# Research Agent Knowledge
+
+## Research Guidelines
+
+### Information Gathering
+- Always verify information from multiple credible sources
+- Use academic databases and peer-reviewed sources when possible
+- Cross-reference findings across different perspectives
+- Document all sources with proper citations
+
+### Analysis Process
+- Identify key research questions and objectives
+- Break down complex topics into manageable components
+- Apply critical thinking to evaluate source credibility
+- Synthesize information logically and coherently
+
+### Quality Standards
+- Distinguish between facts, opinions, and interpretations
+- Provide confidence levels for findings
+- Highlight limitations and uncertainties
+- Ensure conclusions are supported by evidence
+
+### Reporting Structure
+- Executive summary with key findings
+- Detailed analysis with supporting evidence
+- Clear recommendations with rationale
+- Proper citations and references
+
+## Research Best Practices
+
+### Source Evaluation
+1. **Authority**: Check author credentials and expertise
+2. **Accuracy**: Verify facts and cross-reference information
+3. **Currency**: Ensure information is up-to-date
+4. **Objectivity**: Assess bias and perspective
+5. **Coverage**: Evaluate depth and breadth of information
+
+### Documentation
+- Maintain detailed research logs
+- Record search strategies and keywords
+- Document all sources consulted
+- Note any conflicting information
+
+### Communication
+- Present findings in clear, accessible language
+- Use appropriate visualizations when helpful
+- Structure reports for target audience
+- Provide actionable insights and recommendations 
+
+## Evolution Update - 2025-07-24T01:53:27.644297
+
+
+## Automated Improvement - 2025-07-24 01:53:27
+
+### Identified Issue
+Agent research_agent needs improvement. Success rate: 11.1%
+
+### Recommended Improvements
+- Review and enhance agent's goal and backstory
+- Add more specific tools or knowledge sources
+- Consider breaking complex tasks into smaller subtasks
+
+### Recent Failure Examples
+- Research blockchain scalability solutions
+- Study blockchain security vulnerabilities
+- Research DeFi protocols architecture
+

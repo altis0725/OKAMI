@@ -25,7 +25,7 @@ analysis_task:
   
   max_retries: 2
   
-  tools:
-    - FileReadTool
-    - CSVSearchTool
-    - CodeInterpreterTool
+  # tools:
+  #   - FileReadTool
+  #   - CSVSearchTool
+  #   - CodeInterpreterTool

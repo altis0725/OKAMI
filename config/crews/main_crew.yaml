@@ -5,7 +5,8 @@ main_crew:
   process: hierarchical  # Manager intelligently assigns tasks
   
   # Use custom manager agent instead of default LLM manager
-  manager_agent: manager_agent
+  # manager_agent: manager_agent
+  manager_llm: true
 
   # Planning configuration
   planning: true  # Enable planning feature
@@ -22,14 +23,14 @@ main_crew:
   tasks:
     - main_task
 
-  memory: true
+  memory: false  # 一時的に無効化（ChromaDB接続エラー回避）
   memory_config:
-    provider: "mem0"
-    config:
-      user_id: "okami_system"
+    provider: "basic"
   cache: true
   verbose: true
   
+  knowledge_sources: []
+
   embedder:
     provider: "ollama"
     config:

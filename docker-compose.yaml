@@ -12,7 +12,7 @@ services:
       - ./knowledge:/app/knowledge
     environment:
       - PYTHONUNBUFFERED=1
-      - CREWAI_STORAGE_DIR=/tmp/crewai_storage
+      - CREWAI_STORAGE_DIR=/app/storage
       - CREWAI_DISABLE_TELEMETRY=true
       - OTEL_SDK_DISABLED=true
       - LOG_LEVEL=INFO
@@ -20,11 +20,16 @@ services:
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
       - EMBEDDER_PROVIDER=ollama
       - EMBEDDER_MODEL=mxbai-embed-large
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - QDRANT_GRPC_PORT=6334
-      - VECTOR_STORE_TYPE=qdrant
-      - USE_QDRANT=true  # Qdrant知識管理を無効化
+      # QDRANT_HOST=qdrant
+      # QDRANT_PORT=6333
+      # QDRANT_GRPC_PORT=6334
+      - VECTOR_STORE_TYPE=chroma
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - USE_QDRANT=false
+      # CrewAI内部メモリ用のChroma設定
+      - CHROMA_SERVER_HOST=chromadb
+      - CHROMA_SERVER_HTTP_PORT=8000
       # CrewAI知識ベース用の設定
       - CREWAI__EMBEDDINGS__PROVIDER=ollama
       - CREWAI__EMBEDDINGS__MODEL=mxbai-embed-large
@@ -34,7 +39,7 @@ services:
     networks:
       - okami-network
     depends_on:
-      - qdrant
+      - chromadb
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -65,28 +70,43 @@ services:
       - okami-network
     restart: unless-stopped
 
-  # Qdrant for vector storage
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: okami-qdrant
+  # ChromaDB for vector storage
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: okami-chromadb
     ports:
-      - "6333:6333"
-      - "6334:6334"  # gRPC port
+      - "8001:8000"
     volumes:
-      - qdrant-data:/qdrant/storage
+      - chroma-data:/chroma/chroma
     environment:
-      - QDRANT__SERVICE__GRPC_PORT=6334
-      - QDRANT__SERVICE__HTTP_PORT=6333
-      - QDRANT__LOG_LEVEL=INFO
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
     networks:
       - okami-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+
+  # Qdrant for vector storage（無効化）
+  # qdrant:
+  #   image: qdrant/qdrant:latest
+  #   container_name: okami-qdrant
+  #   ports:
+  #     - "6333:6333"
+  #     - "6334:6334"  # gRPC port
+  #   volumes:
+  #     - qdrant-data:/qdrant/storage
+  #   environment:
+  #     - QDRANT__SERVICE__GRPC_PORT=6334
+  #     - QDRANT__SERVICE__HTTP_PORT=6333
+  #     - QDRANT__LOG_LEVEL=INFO
+  #   networks:
+  #     - okami-network
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 30s
 
   # Ollama for local embeddings - ホストのOllamaを使用するためコメントアウト
   # ollama:
@@ -109,7 +129,8 @@ services:
   #     start_period: 120s
 
 volumes:
-  qdrant-data:
+  chroma-data:
+  # qdrant-data:
 
 networks:
   okami-network:

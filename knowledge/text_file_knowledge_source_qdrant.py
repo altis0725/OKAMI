@@ -13,33 +13,11 @@ import structlog
 logger = structlog.get_logger()
 
 
-class TextFileKnowledgeSourceQdrant(TextFileKnowledgeSource):
+class TextFileKnowledgeSourceQdrant:
     """Qdrantを使用するTextFileKnowledgeSource"""
     
-    def __init__(self, file_paths: List[str], metadata: Optional[Dict[str, Any]] = None,
-                 collection_name: str = "okami_knowledge", **kwargs):
-        # 親クラスの初期化
-        super().__init__(file_paths=file_paths, metadata=metadata or {}, **kwargs)
-        
-        # QdrantベースのストレージをセットUp
-        import os
-        embedder_config = {
-            "provider": "ollama",
-            "config": {
-                "model": os.getenv("EMBEDDER_MODEL", "mxbai-embed-large"),
-                "base_url": os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
-            }
-        }
-        self.storage = QdrantKnowledgeStorage(
-            collection_name=collection_name,
-            embedder_config=embedder_config
-        )
-        self.collection_name = collection_name
-        
-        # 統一されたEmbeddingManagerを取得
-        self.embedding_manager = get_embedding_manager(embedder_config)
-        
-        logger.info(f"Initialized TextFileKnowledgeSourceQdrant with {len(file_paths)} files")
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError("Qdrantは無効化されています")
     
     def validate_content(self) -> Dict[str, str]:
         """ファイルの内容を読み込んで検証"""
@@ -114,12 +92,6 @@ class TextFileKnowledgeSourceQdrant(TextFileKnowledgeSource):
             raise
 
 
-def create_qdrant_text_file_source(file_paths: List[str], 
-                                  metadata: Optional[Dict[str, Any]] = None,
-                                  collection_name: str = "okami_knowledge") -> TextFileKnowledgeSourceQdrant:
+def create_qdrant_text_file_source(*args, **kwargs):
     """Qdrantベースのテキストファイル知識ソースを作成するヘルパー関数"""
-    return TextFileKnowledgeSourceQdrant(
-        file_paths=file_paths,
-        metadata=metadata,
-        collection_name=collection_name
-    )
+    raise NotImplementedError("Qdrantは無効化されています")

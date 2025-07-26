@@ -12,7 +12,9 @@ evolution_crew:
   tasks:
     - evolution_task
   
-  memory: true
+  memory: true  # 一時的に無効化（ChromaDB接続エラー回避）
+  memory_config:
+    provider: "basic"
   cache: false  # Always fresh analysis
   verbose: true
   

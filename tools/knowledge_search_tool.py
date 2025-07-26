@@ -13,10 +13,10 @@ logger = structlog.get_logger()
 
 
 class KnowledgeSearcher:
-    """Qdrantを使用した知識検索エンジン"""
+    """知識検索エンジン（Qdrant無効化中、ChromaDBのみ対応）"""
     
     def __init__(self):
-        self.vector_store = get_vector_store()
+        self.vector_store = get_vector_store("chroma")
         self.collection_name = "okami_knowledge"
         self.embedding_dimension = 1024  # mxbai-embed-largeの次元
         
@@ -95,7 +95,7 @@ class KnowledgeSearcher:
         """
         try:
             # 統一されたEmbeddingManagerでドキュメントをエンベディング
-            embeddings = self.embedding_manager.generate_embeddings(documents)
+            # embeddings = self.embedding_manager.generate_embeddings(documents) # This line was removed as per the edit hint
             
             if metadatas is None:
                 metadatas = [{} for _ in documents]
@@ -103,7 +103,7 @@ class KnowledgeSearcher:
             # ベクトルストアに追加
             self.vector_store.upsert(
                 collection_name=self.collection_name,
-                embeddings=embeddings,
+                # embeddings=embeddings, # This line was removed as per the edit hint
                 documents=documents,
                 metadatas=metadatas
             )

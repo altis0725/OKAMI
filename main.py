@@ -359,24 +359,8 @@ async def _trigger_evolution_analysis(task_id: str, task_result: Any, task_descr
         
         # 進化タスクを準備
         evolution_inputs = {
-            "task": f"""Analyze the following task execution and provide improvement recommendations:
-            
-            Original Task: {task_description}
-            Task Result: {str(task_result)[:1000]}  # サイズ制限
-            
-            Please analyze:
-            1. Task execution efficiency
-            2. Response quality
-            3. Agent coordination
-            4. Knowledge gaps
-            5. Process improvements
-            
-            Provide specific, actionable recommendations for:
-            - Knowledge file updates
-            - YAML configuration improvements
-            - Agent prompt optimizations
-            - Tool usage enhancements
-            """
+            "user_input": task_description,
+            "main_response": str(task_result)[:2000]  # サイズ制限を適用
         }
         
         # 進化クルーを取得

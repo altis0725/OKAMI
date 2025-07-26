@@ -16,29 +16,14 @@ from core.embedding_manager import get_embedding_manager
 logger = structlog.get_logger()
 
 
-class QdrantKnowledgeSource(BaseKnowledgeSource):
+class QdrantKnowledgeSource:
     """Qdrantを使用したKnowledgeSource実装"""
     
     content: str = Field(description="Knowledge content to be stored")
     source_name: str = Field(default="qdrant_source", description="Name of the knowledge source")
     
-    def __init__(self, **data):
-        super().__init__(**data)
-        # Qdrantベースのカスタムストレージを初期化
-        if not self.storage:
-            embedder_config = {
-                "provider": "ollama",
-                "config": {
-                    "model": os.getenv("EMBEDDER_MODEL", "mxbai-embed-large"),
-                    "base_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-                }
-            }
-            self.storage = QdrantKnowledgeStorage(
-                collection_name=self.collection_name or "okami_knowledge",
-                embedder_config=embedder_config
-            )
-            # 統一されたEmbeddingManagerを取得
-            self.embedding_manager = get_embedding_manager(embedder_config)
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError("Qdrantは無効化されています")
     
     def validate_content(self) -> str:
         """コンテンツを検証して返す"""
@@ -82,36 +67,8 @@ class QdrantKnowledgeSource(BaseKnowledgeSource):
 class QdrantKnowledgeStorage:
     """Qdrantを使用したKnowledgeStorage実装"""
     
-    def __init__(self, collection_name: str = "okami_knowledge", 
-                 embedder_config: Optional[Dict[str, Any]] = None):
-        # Qdrantベクトルストアを初期化
-        self.vector_store = get_vector_store()
-        self.collection_name = collection_name
-        self.embedder_config = embedder_config or {
-            "provider": "ollama",
-            "config": {
-                "model": os.getenv("EMBEDDER_MODEL", "mxbai-embed-large"),
-                "base_url": os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-            }
-        }
-        
-        # コレクションを作成
-        try:
-            self.vector_store.create_collection(
-                name=self.collection_name,
-                dimension=1024  # mxbai-embed-largeの次元
-            )
-        except Exception as e:
-            logger.debug(f"Collection may already exist: {e}")
-        
-        # 統一されたEmbeddingManagerを使用
-        self.embedding_manager = get_embedding_manager(self.embedder_config)
-        
-        # 親クラスの初期化は行わない（ChromaDBを避けるため）
-        # super().__init__(
-        #     embedder=self.embedder_config,
-        #     collection_name=self.collection_name
-        # )
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError("Qdrantは無効化されています")
     
     def save(self, chunks: List[str], metadata: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None) -> None:
         """チャンクをエンベディングしてQdrantに保存"""

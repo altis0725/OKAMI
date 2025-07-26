@@ -9,8 +9,10 @@ simple_crew:
   tasks:
     - test_task
   
-  memory: false
-  cache: false
+  memory: true  # 一時的に無効化（ChromaDB接続エラー回避）
+  memory_config:
+    provider: "basic"
+  cache: true
   verbose: true
   
   # 知識管理を明示的に無効化

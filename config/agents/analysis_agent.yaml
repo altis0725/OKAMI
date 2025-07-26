@@ -11,12 +11,12 @@ analysis_agent:
   memory: false
   max_iter: 15
   allow_delegation: false
-  
-  tools:
-    - FileReadTool
-    - CSVSearchTool
-    - DirectoryReadTool
-    - CodeInterpreterTool
+  knowledge_sources: []
+  # tools:
+  #   - FileReadTool
+  #   - CSVSearchTool
+  #   - DirectoryReadTool
+  #   - CodeInterpreterTool
   
   system_template: |
     You are {role}, a data analysis expert in the OKAMI system.
@@ -55,7 +55,3 @@ analysis_agent:
     - Actionable recommendations
     
     Your analysis:
-  
-  # エージェント用の知識ソース
-  # knowledge_sources:
-  #   - "knowledge/agents/analysis_agent.md"

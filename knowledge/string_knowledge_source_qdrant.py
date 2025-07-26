@@ -12,33 +12,11 @@ import structlog
 logger = structlog.get_logger()
 
 
-class StringKnowledgeSourceQdrant(StringKnowledgeSource):
+class StringKnowledgeSourceQdrant:
     """Qdrantを使用するStringKnowledgeSource"""
     
-    def __init__(self, content: str, metadata: Optional[Dict[str, Any]] = None, 
-                 collection_name: str = "okami_knowledge", **kwargs):
-        # 親クラスの初期化
-        super().__init__(content=content, metadata=metadata or {}, **kwargs)
-        
-        # QdrantベースのストレージをセットUp
-        import os
-        embedder_config = {
-            "provider": "ollama",
-            "config": {
-                "model": os.getenv("EMBEDDER_MODEL", "mxbai-embed-large"),
-                "base_url": os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
-            }
-        }
-        self.storage = QdrantKnowledgeStorage(
-            collection_name=collection_name,
-            embedder_config=embedder_config
-        )
-        self.collection_name = collection_name
-        
-        # 統一されたEmbeddingManagerを取得
-        self.embedding_manager = get_embedding_manager(embedder_config)
-        
-        logger.info(f"Initialized StringKnowledgeSourceQdrant with collection: {collection_name}")
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError("Qdrantは無効化されています")
     
     def add(self) -> None:
         """コンテンツを処理してQdrantに保存（親クラスのaddメソッドをオーバーライド）"""
@@ -67,11 +45,6 @@ class StringKnowledgeSourceQdrant(StringKnowledgeSource):
             raise
 
 
-def create_qdrant_string_source(content: str, metadata: Optional[Dict[str, Any]] = None,
-                               collection_name: str = "okami_knowledge") -> StringKnowledgeSourceQdrant:
+def create_qdrant_string_source(*args, **kwargs):
     """Qdrantベースの文字列知識ソースを作成するヘルパー関数"""
-    return StringKnowledgeSourceQdrant(
-        content=content,
-        metadata=metadata,
-        collection_name=collection_name
-    )
+    raise NotImplementedError("Qdrantは無効化されています")

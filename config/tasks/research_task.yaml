@@ -21,7 +21,7 @@ research_task:
   
   max_retries: 3
   
-  tools:
-    - SerperDevTool
-    - WebsiteSearchTool
-    - FileReadTool
+  # tools:
+  #   - SerperDevTool
+  #   - WebsiteSearchTool
+  #   - FileReadTool

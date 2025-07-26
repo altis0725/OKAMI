@@ -26,6 +26,6 @@ writing_task:
   
   max_retries: 2
   
-  tools:
-    - FileWriteTool
-    - FileReadTool
+  # tools:
+  #   - FileWriteTool
+  #   - FileReadTool

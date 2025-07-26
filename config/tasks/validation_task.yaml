@@ -29,6 +29,6 @@ validation_task:
   
   max_retries: 1
   
-  tools:
-    - FileReadTool
-    - DirectoryReadTool
+  # tools:
+  #   - FileReadTool
+  #   - DirectoryReadTool

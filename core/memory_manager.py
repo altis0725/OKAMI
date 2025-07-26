@@ -107,7 +107,11 @@ class MemoryManager:
         """
         try:
             if self.external_memory:
-                self.external_memory.save(value, metadata=metadata)
+                # valueがstrまたはdictならリストでラップ
+                wrapped_value = value
+                if isinstance(value, (str, dict)):
+                    wrapped_value = [value]
+                self.external_memory.save(wrapped_value, metadata=metadata)
             logger.info("Memory saved", key=key, has_metadata=bool(metadata))
         except Exception as e:
             logger.error(f"Failed to save memory: {e}", key=key)

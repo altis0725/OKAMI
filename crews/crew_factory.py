@@ -10,6 +10,7 @@ from pathlib import Path
 import structlog
 
 from crewai import Crew, Agent, Task, LLM
+from crewai.memory.external.external_memory import ExternalMemory
 from core.memory_manager import MemoryManager
 from core.knowledge_manager import KnowledgeManager
 from core.guardrail_manager import GuardrailManager
@@ -274,9 +275,9 @@ class CrewFactory:
                 
                 # 知識検索ツールのチェック
                 if "knowledge_search" in tools_config:
-                    agent_tools.append(search_knowledge)
+                    task_tools.append(search_knowledge)
                 if "add_knowledge" in tools_config:
-                    agent_tools.append(add_knowledge_to_base)
+                    task_tools.append(add_knowledge_to_base)
                 
                 # その他のツール名をチェック（将来的に拡張可能）
                 for tool_name in tools_config:
@@ -442,6 +443,28 @@ class CrewFactory:
             config.setdefault("memory", True)
             config.setdefault("cache", True)
             config.setdefault("verbose", True)
+            
+            # mem0を使用する場合は、external_memoryとして設定
+            memory_config = config.get("memory_config", {})
+            if memory_config.get("provider") == "mem0" and os.getenv("MEM0_API_KEY"):
+                try:
+                    external_memory = ExternalMemory(
+                        embedder_config={
+                            "provider": "mem0",
+                            "config": {
+                                "user_id": memory_config.get("config", {}).get("user_id", "okami_system"),
+                                "api_key": os.getenv("MEM0_API_KEY")
+                            }
+                        }
+                    )
+                    config["external_memory"] = external_memory
+                    # memory_configプロバイダーをbasicに変更（external_memoryと併用）
+                    config["memory_config"]["provider"] = "basic"
+                    logger.info("Mem0 external memory configured")
+                except Exception as e:
+                    logger.error(f"Failed to configure mem0 external memory: {e}")
+                    # エラー時はbasicプロバイダーを使用
+                    config["memory_config"]["provider"] = "basic"
             
             # マネージャー設定の処理
             if manager_llm:
