@@ -41,8 +41,8 @@ class OkamiConfig(BaseSettings):
     claude_monitor_webhook_url: Optional[str] = Field(None, env="CLAUDE_MONITOR_WEBHOOK_URL")
 
     # Database Settings
-    chroma_host: str = Field(default="localhost", env="CHROMA_HOST")
-    chroma_port: int = Field(default=8001, env="CHROMA_PORT")
+    chroma_host: str = Field(default="chromadb", env="CHROMA_HOST")
+    chroma_port: int = Field(default=8000, env="CHROMA_PORT")
     
     # Vector Store Settings
     vector_store_type: str = Field(default="chroma", env="VECTOR_STORE_TYPE")
@@ -66,7 +66,7 @@ class OkamiConfig(BaseSettings):
     # Embedding Settings (EmbeddingManager用)
     ollama_base_url: str = Field(default="http://localhost:11434", env="OLLAMA_BASE_URL")
     embedding_batch_size: int = Field(default=10, env="EMBEDDING_BATCH_SIZE")
-    embedding_max_retries: int = Field(default=3, env="EMBEDDING_MAX_RETRIES")
+    embedding_max_retries: int = Field(default=1, env="EMBEDDING_MAX_RETRIES")
     embedding_retry_delay: float = Field(default=1.0, env="EMBEDDING_RETRY_DELAY")
 
     # Guardrail Settings
@@ -150,7 +150,9 @@ class OkamiConfig(BaseSettings):
                 # Ollama API最新仕様に対応
                 "api_endpoint": "/api/embed",  # 推奨エンドポイント
                 "truncate": True,  # コンテキスト長制限対応
-                "keep_alive": "5m"  # モデル保持時間
+                "keep_alive": "5m",  # モデル保持時間
+                "verbose": True,  # 詳細ログ
+                "debug": True  # デバッグモード
             })
 
         return config
