@@ -51,6 +51,8 @@ logs/
 storage/chroma/
 storage/knowledge/
 storage/memory/
+storage/entities/
+storage/short_term/
 *.lock
 chromadb-*.lock
 
