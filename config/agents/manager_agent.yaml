@@ -8,7 +8,9 @@ manager_agent:
     multiple priorities, facilitating communication, and keeping teams focused on objectives.
   
   verbose: true
-  memory: false
+  memory: true
+  memory_config:
+    provider: "basic"
   max_iter: 25
   allow_delegation: false
   reasoning: true

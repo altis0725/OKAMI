@@ -5,8 +5,8 @@ main_crew:
   process: hierarchical  # Manager intelligently assigns tasks
   
   # Use custom manager agent instead of default LLM manager
-  # manager_agent: manager_agent
-  manager_llm: true
+  manager_agent: manager_agent
+  # manager_llm: true
 
   # Planning configuration
   planning: true  # Enable planning feature
@@ -23,18 +23,29 @@ main_crew:
   tasks:
     - main_task
 
-  memory: false  # 一時的に無効化（ChromaDB接続エラー回避）
+  # Memory設定（basicメモリとmem0 external memoryを併用）
+  memory: true  # basicメモリを有効化
+  # external_memoryはcrew_factory.pyで動的に設定される（mem0）
   memory_config:
-    provider: "basic"
+    provider: "basic"  # 通常のメモリはbasicを使用
+    config: {}
+    user_memory: {}
+  # Mem0設定（crew_factory.pyでexternal_memoryとして設定される）
+  mem0_config:
+    user_id: "okami_main_crew"  # ユーザーID
+    # org_id: "your_org_id"  # オプション
+    # project_id: "your_project_id"  # オプション
   cache: true
   verbose: true
   
   knowledge_sources: []
 
+  # Embedder設定（ベクトル化にはollamaを使用）
   embedder:
-    provider: "ollama"
+    provider: "ollama"  # ollamaを使用
     config:
       model: "mxbai-embed-large"
+      url: "http://host.docker.internal:11434/api/embeddings"
   
   guardrails:
     - type: "quality"

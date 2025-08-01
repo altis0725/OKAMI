@@ -36,8 +36,6 @@ evolution_task:
     }
     Each change must include: type, agent/file, parameter/content, value, and reason
   
-  agent: evolution_agent
-  
   output_json: EvolutionChanges
   
   # tools:

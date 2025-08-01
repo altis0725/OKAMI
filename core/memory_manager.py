@@ -40,6 +40,7 @@ class MemoryManager:
         Path(self.storage_path).mkdir(parents=True, exist_ok=True)
 
         # Initialize memory components
+        self._init_short_term_memory()
         self._init_long_term_memory()
         self._init_external_memory()
 
@@ -49,12 +50,15 @@ class MemoryManager:
             use_mem0=self.use_mem0,
         )
 
+    def _init_short_term_memory(self) -> None:
+        """短期メモリ初期化（Qdrantを使わないため無効化）"""
+        # Qdrantを使わないため、ShortTermMemoryは初期化しない
+        self.short_term_memory = None
+
     def _init_long_term_memory(self) -> None:
-        """長期メモリストレージ初期化"""
-        db_path = os.path.join(self.storage_path, "long_term_memory.db")
-        self.long_term_memory = LongTermMemory(
-            storage=LTMSQLiteStorage(db_path=db_path)
-        )
+        """長期メモリ初期化（Qdrantを使わないため無効化）"""
+        # Qdrantを使わないため、LongTermMemoryは初期化しない
+        self.long_term_memory = None
 
     def _init_external_memory(self) -> None:
         """外部メモリ（Mem0）初期化"""
@@ -62,12 +66,19 @@ class MemoryManager:
             try:
                 self.external_memory = ExternalMemory(
                     embedder_config={
+                        "provider": "huggingface",
+                        "config": {
+                            "model": "sentence-transformers/all-MiniLM-L6-v2"
+                        }
+                    },
+                    memory_config={
                         "provider": "mem0",
                         "config": {
                             "user_id": self.mem0_config.get("user_id", "okami_system"),
-                            "api_key": os.getenv("MEM0_API_KEY"),
-                            **self.mem0_config,
-                        },
+                            "org_id": self.mem0_config.get("org_id"),
+                            "project_id": self.mem0_config.get("project_id"),
+                            "api_key": os.getenv("MEM0_API_KEY")
+                        }
                     }
                 )
                 logger.info("Mem0 external memory initialized successfully")
@@ -78,68 +89,76 @@ class MemoryManager:
             self.external_memory = None
 
     def get_memory_config(self) -> Dict[str, Any]:
-        """CrewAI用メモリ設定を取得"""
+        """CrewAI用メモリ設定を取得（Qdrantを使わずにmem0のみ使用）"""
         config = {
             "memory": True,
-            "long_term_memory": self.long_term_memory,
         }
 
-        if self.external_memory:
-            config["external_memory"] = self.external_memory
-
         if self.use_mem0:
+            # ExternalMemoryを使用する設定（embedderはollama、memoryはmem0）
+            from crewai.memory.external.external_memory import ExternalMemory
+            
+            external_memory = ExternalMemory(
+                embedder_config={
+                    "provider": "huggingface",
+                    "config": {
+                        "model": "sentence-transformers/all-MiniLM-L6-v2"
+                    }
+                },
+                memory_config={
+                    "provider": "mem0",
+                    "config": {
+                        "user_id": self.mem0_config.get("user_id", "okami_system"),
+                        "org_id": self.mem0_config.get("org_id"),
+                        "project_id": self.mem0_config.get("project_id"),
+                        "api_key": os.getenv("MEM0_API_KEY")
+                    }
+                }
+            )
+            
+            config["memory"] = True
+            config["external_memory"] = external_memory
+        else:
+            # デフォルトのbasic memory設定（Qdrantを使わない）
             config["memory_config"] = {
-                "provider": "mem0",
-                "config": self.mem0_config,
-                "user_memory": {},
+                "provider": "basic",
+                "config": {},
+                "user_memory": {}
             }
 
         return config
 
-    def save_memory(self, key: str, value: Any, metadata: Optional[Dict] = None) -> None:
-        """
-        メモリエントリ保存
-
-        Args:
-            key: メモリキー
-            value: メモリ値
-            metadata: 追加メタデータ
-        """
+    def save_memory(self, key: str, value: str, metadata: Dict[str, Any] = None) -> bool:
+        """メモリを保存"""
         try:
             if self.external_memory:
-                # valueがstrまたはdictならリストでラップ
-                wrapped_value = value
-                if isinstance(value, (str, dict)):
-                    wrapped_value = [value]
-                self.external_memory.save(wrapped_value, metadata=metadata)
-            logger.info("Memory saved", key=key, has_metadata=bool(metadata))
-        except Exception as e:
-            logger.error(f"Failed to save memory: {e}", key=key)
-
-    def search_memory(
-        self, query: str, limit: int = 10, score_threshold: float = 0.5
-    ) -> List[Dict]:
-        """
-        メモリ検索
-
-        Args:
-            query: 検索クエリ
-            limit: 最大件数
-            score_threshold: 閾値
-
-        Returns:
-            検索結果リスト
-        """
-        try:
-            if self.external_memory:
-                results = self.external_memory.search(
-                    query, limit=limit, score_threshold=score_threshold
+                # mem0のAPI形式に合わせてデータを整形
+                # mem0はExternalMemoryItemのリストを期待する
+                from crewai.memory.external.external_memory_item import ExternalMemoryItem
+                
+                memory_item = ExternalMemoryItem(
+                    content=value,
+                    metadata=metadata or {},
+                    key=key
                 )
-                logger.info(f"Memory search completed", query=query, results=len(results))
+                
+                # リスト形式で保存
+                self.external_memory.save([memory_item])
+                return True
+            return False
+        except Exception as e:
+            self.logger.error(f"Failed to save memory: {e}")
+            return False
+
+    def search_memory(self, query: str, limit: int = 10, score_threshold: float = 0.5) -> List[Dict[str, Any]]:
+        """メモリを検索"""
+        try:
+            if self.external_memory:
+                results = self.external_memory.search(query, limit=limit, score_threshold=score_threshold)
                 return results
             return []
         except Exception as e:
-            logger.error(f"Failed to search memory: {e}", query=query)
+            self.logger.error(f"Failed to search memory: {e}")
             return []
 
     def reset_memory(self, memory_type: str = "all") -> None:

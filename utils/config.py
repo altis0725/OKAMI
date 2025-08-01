@@ -43,6 +43,7 @@ class OkamiConfig(BaseSettings):
     # Database Settings
     chroma_host: str = Field(default="chromadb", env="CHROMA_HOST")
     chroma_port: int = Field(default=8000, env="CHROMA_PORT")
+    chroma_persist_directory: str = Field(default="./storage/chroma", env="CHROMA_PERSIST_DIRECTORY")
     
     # Vector Store Settings
     vector_store_type: str = Field(default="chroma", env="VECTOR_STORE_TYPE")

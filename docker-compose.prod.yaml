@@ -14,6 +14,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - CREWAI_STORAGE_DIR=/app/storage
+      - CHROMA_PERSIST_DIRECTORY=/app/storage/chroma
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - PRODUCTION=true
       - SERVER_HOST=0.0.0.0

@@ -20,8 +20,11 @@ OKAMIは、CrewAI 0.140.0をベースに構築された自己成長型AIエー�
 
 ### 1. 🧠 Memory機能 ✅
 - **Basic Provider**: メモリ永続化（実装済み）
+- **Mem0統合**: 永続的なメモリ管理（実装済み）
 - **短期記憶**: 会話コンテキストの保持
 - **長期記憶**: 学習結果の永続化
+- **エンティティ記憶**: エンティティの追跡
+- **セマンティック検索**: 関連情報の高度な検索
 
 ### 2. 📚 Knowledge機能 ✅
 - **知識ベース**: ガイドライン、ベストプラクティス、エラーパターン（実装済み）
@@ -94,7 +97,7 @@ OKAMI/
 - **Monica LLM**: GPT-4o互換API
 - **Qdrant**: 高性能ベクトルストレージ
 - **Ollama**: ローカル埋め込みモデル（mxbai-embed-large）
-- **Mem0**: メモリ管理
+- **Mem0**: 永続的メモリ管理（クラウド・ローカル対応）
 - **Docker**: コンテナ化
 - **Claude Code**: 外部監視
 - **structlog**: 構造化ログ
@@ -161,7 +164,7 @@ import requests
 response = requests.post(
     "http://localhost:8000/tasks",
     json={
-        "crew_name": "main_crew",
+        "crew_name": "simple_crew",
         "task": "Hello Worldプログラムを作成",
         "async_execution": False
     }

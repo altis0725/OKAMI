@@ -51,6 +51,8 @@ logs/
 storage/chroma/
 storage/knowledge/
 storage/memory/
+*.lock
+chromadb-*.lock
 
 # CrewAI
 crewai_storage/

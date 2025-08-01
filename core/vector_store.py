@@ -188,26 +188,35 @@ class VectorStore(ABC):
 class ChromaVectorStore(VectorStore):
     """ChromaDBベクトルストアの実装（後方互換性のため）"""
     
-    def __init__(self, host: str = None, port: int = None):
+    def __init__(self, host: str = None, port: int = None, persist_directory: str = None):
         """
         ChromaDBクライアントを初期化
         
         Args:
             host: ChromaDBホスト（デフォルト: 環境変数 CHROMA_HOST または localhost）
             port: ポート（デフォルト: 環境変数 CHROMA_PORT または 8000）
+            persist_directory: 永続化ディレクトリ（デフォルト: 環境変数 CHROMA_PERSIST_DIRECTORY または ./storage/chroma）
         """
         self.host = host or os.getenv("CHROMA_HOST", "localhost")
         self.port = port or int(os.getenv("CHROMA_PORT", "8000"))
+        self.persist_directory = persist_directory or os.getenv("CHROMA_PERSIST_DIRECTORY", "./storage/chroma")
         
-        self.client = chromadb.HttpClient(
-            host=self.host,
-            port=self.port
-        )
+        # 永続化ディレクトリが指定されている場合はPersistentClientを使用
+        if self.persist_directory and self.persist_directory != "":
+            # ディレクトリが存在しない場合は作成
+            os.makedirs(self.persist_directory, exist_ok=True)
+            self.client = chromadb.PersistentClient(path=self.persist_directory)
+        else:
+            self.client = chromadb.HttpClient(
+                host=self.host,
+                port=self.port
+            )
         
         logger.info(
             "ChromaDB vector store initialized",
             host=self.host,
-            port=self.port
+            port=self.port,
+            persist_directory=self.persist_directory
         )
     
     def create_collection(self, name: str, dimension: int) -> None:

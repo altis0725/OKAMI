@@ -409,10 +409,16 @@ class CrewFactory:
                         # マネージャーエージェントは階層プロセスでは別扱いなので追加しない
                         pass
             
-            # エンベッダー設定の取得
-            embedder_config = config.get("embedder", self.config.get_embedder_config())
+            # エンベッダー設定の取得（ollamaを使用）
+            embedder_config = {
+                "provider": "ollama",  # ollamaを使用
+                "config": {
+                    "model": "mxbai-embed-large",
+                    "url": "http://host.docker.internal:11434/api/embeddings"
+                }
+            }
             
-            # Knowledge sourcesの処理
+            # Knowledge sourcesの処理（Qdrantを使わないため簡素化）
             knowledge_sources = []
             if config.get("knowledge_sources"):
                 # 共有KnowledgeManagerインスタンスを使用
@@ -444,27 +450,71 @@ class CrewFactory:
             config.setdefault("cache", True)
             config.setdefault("verbose", True)
             
+            # embedder設定を追加（Qdrantを使わない設定）
+            config["embedder"] = embedder_config
+            
             # mem0を使用する場合は、external_memoryとして設定
             memory_config = config.get("memory_config", {})
-            if memory_config.get("provider") == "mem0" and os.getenv("MEM0_API_KEY"):
+            mem0_config = config.get("mem0_config", {})
+            
+            # mem0_configが存在し、MEM0_API_KEYがある場合はexternal_memoryを設定
+            if mem0_config and os.getenv("MEM0_API_KEY"):
                 try:
+                    # mem0_configからuser_idを取得
+                    mem0_user_id = mem0_config.get("user_id", "okami_system")
+                    
+                    # ExternalMemoryを使用する設定
+                    from crewai.memory.external.external_memory import ExternalMemory
+                    
                     external_memory = ExternalMemory(
                         embedder_config={
                             "provider": "mem0",
                             "config": {
-                                "user_id": memory_config.get("config", {}).get("user_id", "okami_system"),
-                                "api_key": os.getenv("MEM0_API_KEY")
+                                "user_id": mem0_user_id,
+                                "org_id": mem0_config.get("org_id"),
+                                "project_id": mem0_config.get("project_id"),
+                                "api_key": os.getenv("MEM0_API_KEY"),
+                                "truncate_metadata": True,
+                                "max_metadata_length": 1800
                             }
                         }
                     )
-                    config["external_memory"] = external_memory
-                    # memory_configプロバイダーをbasicに変更（external_memoryと併用）
-                    config["memory_config"]["provider"] = "basic"
-                    logger.info("Mem0 external memory configured")
+                    
+                    # CrewAIの正しい設定方法に従って設定
+                    config["memory"] = True  # メモリを有効化
+                    config["external_memory"] = external_memory  # ExternalMemoryを設定
+                    
+                    # mem0_configは削除（処理済みのため）
+                    if "mem0_config" in config:
+                        del config["mem0_config"]
+                    
+                    logger.info("Mem0 external memory configured", user_id=mem0_user_id)
+                    
                 except Exception as e:
                     logger.error(f"Failed to configure mem0 external memory: {e}")
-                    # エラー時はbasicプロバイダーを使用
-                    config["memory_config"]["provider"] = "basic"
+                    # フォールバック: 基本メモリ設定
+                    config["memory"] = True
+                    config["memory_config"] = {
+                        "provider": "basic",
+                        "config": {},
+                        "user_memory": {}
+                    }
+            elif mem0_config and not os.getenv("MEM0_API_KEY"):
+                # mem0_configが設定されているがAPIキーがない場合
+                logger.warning("Mem0 configured but MEM0_API_KEY not found, using basic memory only")
+                # mem0_configを削除
+                if "mem0_config" in config:
+                    del config["mem0_config"]
+            
+            # memory_configが設定されていない、または基本設定の場合
+            if not memory_config or memory_config.get("provider") != "basic":
+                # デフォルトのbasic memoryを設定
+                config["memory"] = True
+                config["memory_config"] = {
+                    "provider": "basic",
+                    "config": {},
+                    "user_memory": {}
+                }
             
             # マネージャー設定の処理
             if manager_llm:
@@ -479,7 +529,8 @@ class CrewFactory:
             # エンベッダー設定の処理
             # memory_config.providerに関わらず、knowledge_sourcesがある場合は常にembedderを設定
             if knowledge_sources or config.get("embedder"):
-                config["embedder"] = embedder_config
+                # embedder設定は既に上で設定済み
+                pass
             
             # Evolution Crewの場合、コールバックを追加
             if crew_name == "evolution_crew":

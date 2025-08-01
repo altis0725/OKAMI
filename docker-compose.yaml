@@ -26,6 +26,7 @@ services:
       - VECTOR_STORE_TYPE=chroma
       - CHROMA_HOST=chromadb
       - CHROMA_PORT=8000
+      - CHROMA_PERSIST_DIRECTORY=/app/storage/chroma
       - USE_QDRANT=false
       # CrewAI内部メモリ用のChroma設定
       - CHROMA_SERVER_HOST=chromadb
