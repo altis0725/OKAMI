@@ -48,11 +48,18 @@ logs/
 *.sqlite3
 
 # ChromaDB
-storage/chroma/
-storage/knowledge/
-storage/memory/
-storage/entities/
-storage/short_term/
+storage/
+
+# Knowledge files (Python files only)
+knowledge/**/*.md
+knowledge/**/*.pdf
+knowledge/**/*.txt
+knowledge/**/*.json
+knowledge/**/*.yaml
+knowledge/**/*.yml
+knowledge/**/*.bak
+knowledge/**/*.log
+
 *.lock
 chromadb-*.lock
 
@@ -89,3 +96,6 @@ temp/
 .mcp.json
 CLAUDE.md
 .claude/
+
+# Serena
+.serena/
