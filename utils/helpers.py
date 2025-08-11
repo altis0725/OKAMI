@@ -256,14 +256,14 @@ def truncate_dict(data: Dict[str, Any], max_depth: int = 3, max_items: int = 10)
 
 def format_error(error: Exception, include_traceback: bool = False) -> Dict[str, Any]:
     """
-    Format exception for logging
+    ログ用に例外を整形
 
     Args:
-        error: Exception object
-        include_traceback: Include full traceback
+        error: 例外オブジェクト
+        include_traceback: 完全なトレースバックを含めるか
 
     Returns:
-        Formatted error dict
+        整形済みエラー辞書
     """
     error_dict = {
         "error_type": type(error).__name__,
@@ -287,14 +287,14 @@ def format_error(error: Exception, include_traceback: bool = False) -> Dict[str,
 
 def calculate_success_rate(successes: int, total: int) -> float:
     """
-    Calculate success rate safely
+    成功率を安全に計算
 
     Args:
-        successes: Number of successes
-        total: Total attempts
+        successes: 成功回数
+        total: 試行回数合計
 
     Returns:
-        Success rate (0-1)
+        成功率 (0-1)
     """
     if total <= 0:
         return 0.0

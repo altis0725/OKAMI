@@ -1,0 +1,62 @@
+[Unit]
+Description=OKAMI AI Agent System
+Documentation=https://github.com/yourusername/okami
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=okami
+Group=docker
+WorkingDirectory=/opt/okami
+
+# 環境変数
+Environment="COMPOSE_PROJECT_NAME=okami"
+Environment="COMPOSE_FILE=docker-compose.prod.yaml"
+
+# サービス開始前のチェック
+ExecStartPre=/usr/bin/docker-compose -f docker-compose.prod.yaml pull
+ExecStartPre=/usr/bin/docker-compose -f docker-compose.prod.yaml build
+
+# サービスの開始
+ExecStart=/usr/bin/docker-compose -f docker-compose.prod.yaml up
+
+# サービスの停止
+ExecStop=/usr/bin/docker-compose -f docker-compose.prod.yaml down
+
+# サービスのリロード
+ExecReload=/usr/bin/docker-compose -f docker-compose.prod.yaml restart
+
+# 再起動ポリシー
+Restart=always
+RestartSec=10s
+
+# タイムアウト設定
+TimeoutStartSec=300
+TimeoutStopSec=30
+
+# プロセス管理
+KillMode=mixed
+KillSignal=SIGTERM
+
+# リソース制限
+# メモリ制限（必要に応じて調整）
+MemoryLimit=8G
+# CPU制限（必要に応じて調整）
+CPUQuota=200%
+
+# ログ設定
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=okami
+
+# セキュリティ設定
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/okami
+
+[Install]
+WantedBy=multi-user.target

@@ -57,6 +57,14 @@ class CrewFactory:
         self._knowledge_manager = None
         self._initialize_knowledge_manager()
         
+        # MemoryManagerの初期化（グラフメモリ対応）
+        self.memory_manager = MemoryManager(use_graph_memory=True)
+        
+        # KnowledgeGraphIntegrationの初期化
+        if self.memory_manager.kg_integration:
+            # KnowledgeManagerを統合層に設定
+            self.memory_manager.kg_integration.knowledge_manager = self._knowledge_manager
+        
         logger.info(
             "Crew Factory initialized",
             agents=len(self.agent_configs),
@@ -463,19 +471,16 @@ class CrewFactory:
                     # mem0_configからuser_idを取得
                     mem0_user_id = mem0_config.get("user_id", "okami_system")
                     
-                    # ExternalMemoryを使用する設定
+                    # ExternalMemoryを使用する設定（Mem0用）
                     from crewai.memory.external.external_memory import ExternalMemory
                     
+                    # Mem0を使用する場合、embedder_configにMem0の設定全体を含める
                     external_memory = ExternalMemory(
                         embedder_config={
                             "provider": "mem0",
                             "config": {
                                 "user_id": mem0_user_id,
-                                "org_id": mem0_config.get("org_id"),
-                                "project_id": mem0_config.get("project_id"),
-                                "api_key": os.getenv("MEM0_API_KEY"),
-                                "truncate_metadata": True,
-                                "max_metadata_length": 1800
+                                "api_key": os.getenv("MEM0_API_KEY")
                             }
                         }
                     )
@@ -515,6 +520,17 @@ class CrewFactory:
                     "config": {},
                     "user_memory": {}
                 }
+            
+            # グラフメモリの設定（crew_configから読み取るか、デフォルトで有効）
+            use_graph_memory = config.get("graph_memory", True)
+            if use_graph_memory and self.memory_manager.graph_memory:
+                # グラフメモリ統計情報をログに記録
+                stats = self.memory_manager.graph_memory.get_graph_statistics()
+                logger.info(
+                    "Graph memory enabled",
+                    nodes=stats.get("total_nodes", 0),
+                    edges=stats.get("total_edges", 0)
+                )
             
             # マネージャー設定の処理
             if manager_llm:

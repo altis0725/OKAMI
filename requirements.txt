@@ -1,5 +1,5 @@
 # Core dependencies
-crewai[tools]==0.150.0
+crewai[tools]==0.157.0
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
 pydantic==2.10.3
@@ -7,12 +7,12 @@ pydantic-settings==2.6.1
 
 # Database and storage
 chromadb==0.5.23
-qdrant-client==1.12.0
+#qdrant-client==1.12.0
 sqlalchemy==2.0.36
 alembic==1.14.0
 
 # Memory and knowledge
-mem0ai==0.1.114
+mem0ai==0.1.115
 ollama==0.3.3
 
 # Monitoring and logging

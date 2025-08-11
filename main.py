@@ -374,7 +374,7 @@ async def _trigger_evolution_analysis(task_id: str, task_result: Any, task_descr
         task_history[evolution_task_id] = {
             "task_id": evolution_task_id,
             "crew_name": "evolution_crew",
-            "task_description": evolution_inputs["task"],
+            "task_description": evolution_inputs["user_input"],
             "status": "processing",
             "timestamp": datetime.utcnow(),
             "parent_task_id": task_id
@@ -382,7 +382,13 @@ async def _trigger_evolution_analysis(task_id: str, task_result: Any, task_descr
         
         start_time = time.time()
         try:
-            evolution_result = evolution_crew.kickoff(inputs=evolution_inputs)
+            # kickoff_asyncを使用して非同期実行
+            if hasattr(evolution_crew, 'kickoff_async'):
+                evolution_result = await evolution_crew.kickoff_async(inputs=evolution_inputs)
+            else:
+                # フォールバック: 同期実行
+                evolution_result = evolution_crew.kickoff(inputs=evolution_inputs)
+            
             execution_time = time.time() - start_time
             
             task_history[evolution_task_id].update({

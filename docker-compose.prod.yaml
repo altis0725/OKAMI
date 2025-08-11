@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   # Main OKAMI service
   okami:
@@ -5,24 +7,77 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: okami-main
-    ports:
-      - "${SERVER_PORT:-8000}:8000"
+    expose:
+      - "8000"
     volumes:
       - ./storage:/app/storage
       - ./logs:/app/logs
       - ./knowledge:/app/knowledge
+      - ./evolution:/app/evolution
+      - ./config:/app/config
+      - ./crews:/app/crews
+      - ./tools:/app/tools
+      - ./core:/app/core
+      - ./guardrails:/app/guardrails
+      - ./utils:/app/utils
     environment:
+      # Python設定
       - PYTHONUNBUFFERED=1
+      
+      # CrewAI設定
       - CREWAI_STORAGE_DIR=/app/storage
-      - CHROMA_PERSIST_DIRECTORY=/app/storage/chroma
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - PRODUCTION=true
+      - CREWAI_DISABLE_TELEMETRY=true
+      - OTEL_SDK_DISABLED=true
+      
+      # サーバー設定
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8000
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PRODUCTION=true
+      - ALLOWED_HOSTS=traning.work,www.traning.work,138.2.45.112,localhost
+      
+      # ベクトルストア設定
+      - VECTOR_STORE_TYPE=chroma
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - CHROMA_PERSIST_DIRECTORY=/app/storage/chroma
+      - CHROMA_AUTH_TOKEN=${CHROMA_AUTH_TOKEN:-okami-secret-token}
+      
+      # CrewAI内部メモリ用のChroma設定
+      - CHROMA_SERVER_HOST=chromadb
+      - CHROMA_SERVER_HTTP_PORT=8000
+      
+      # Embeddings設定（本番環境ではOpenAIを使用）
+      - EMBEDDER_PROVIDER=${EMBEDDER_PROVIDER:-openai}
+      - EMBEDDER_MODEL=${EMBEDDER_MODEL:-text-embedding-3-small}
+      
+      # CrewAI知識ベース用の設定
+      - CREWAI__EMBEDDINGS__PROVIDER=${EMBEDDER_PROVIDER:-openai}
+      - CREWAI__EMBEDDINGS__MODEL=${EMBEDDER_MODEL:-text-embedding-3-small}
+      
+      # Ollama設定（オプション）
+      - OLLAMA_HOST=${OLLAMA_HOST:-}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-}
+      
+      # MCP Gateway設定（オプション）
+      - MCP_GATEWAY_URL=${MCP_GATEWAY_URL:-}
+      - MCP_ENABLED=${MCP_ENABLED:-false}
+      
+      # メモリ設定
+      - MEMORY_PROVIDER=${MEMORY_PROVIDER:-basic}
+      - MEMORY_DB_PATH=/app/storage/memory.db
+      
+      # パフォーマンス設定
+      - MAX_WORKERS=${MAX_WORKERS:-4}
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-300}
+      - TASK_TIMEOUT=${TASK_TIMEOUT:-600}
     env_file:
-      - .env
+      - .env.production
     networks:
       - okami-network
+    depends_on:
+      - chromadb
     restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -39,46 +94,18 @@ services:
           cpus: '1'
           memory: 2G
 
-  # Claude Code Quality Monitor service
-  claude-monitor:
-    build:
-      context: .
-      dockerfile: Dockerfile.monitor
-    container_name: okami-quality-monitor
-    volumes:
-      - ./monitoring:/app/monitoring
-      - ./logs:/app/logs
-    environment:
-      - OKAMI_API_URL=http://okami:8000
-      - QUALITY_CHECK_INTERVAL=${QUALITY_CHECK_INTERVAL:-30}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - PRODUCTION=true
-    env_file:
-      - .env
-    depends_on:
-      okami:
-        condition: service_healthy
-    networks:
-      - okami-network
-    restart: always
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 1G
-
   # ChromaDB for vector storage
   chromadb:
     image: chromadb/chroma:latest
     container_name: okami-chromadb
-    ports:
-      - "8001:8000"
+    expose:
+      - "8000"
     volumes:
       - chroma-data:/chroma/chroma
     environment:
       - IS_PERSISTENT=TRUE
       - ANONYMIZED_TELEMETRY=FALSE
-      - CHROMA_AUTH_PROVIDER=chromadb.auth.token.TokenAuthServerProvider
+      - CHROMA_AUTH_PROVIDER=${CHROMA_AUTH_PROVIDER:-chromadb.auth.token.TokenAuthServerProvider}
       - CHROMA_AUTH_CREDENTIALS=${CHROMA_AUTH_TOKEN:-okami-secret-token}
     networks:
       - okami-network
@@ -88,8 +115,14 @@ services:
         limits:
           cpus: '1'
           memory: 2G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
-  # Nginx reverse proxy for production
+  # Nginx reverse proxy with SSL
   nginx:
     image: nginx:alpine
     container_name: okami-nginx
@@ -97,30 +130,90 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/certbot/www:/var/www/certbot:ro
+      - ./nginx/certbot/conf:/etc/letsencrypt:ro
+      - nginx-cache:/var/cache/nginx
+      - nginx-logs:/var/log/nginx
     depends_on:
       - okami
     networks:
       - okami-network
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Log aggregator
-  logstash:
-    image: docker.elastic.co/logstash/logstash:8.11.1
-    container_name: okami-logstash
+  # Certbot for SSL certificate management
+  certbot:
+    image: certbot/certbot:latest
+    container_name: okami-certbot
     volumes:
-      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
-      - ./logs:/logs:ro
-    environment:
-      - LS_JAVA_OPTS=-Xmx512m -Xms512m
+      - ./nginx/certbot/www:/var/www/certbot:rw
+      - ./nginx/certbot/conf:/etc/letsencrypt:rw
+    networks:
+      - okami-network
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+  # Optional: Ollama for local embeddings (本番環境では通常不要)
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: okami-ollama
+  #   expose:
+  #     - "11434"
+  #   volumes:
+  #     - ollama-data:/root/.ollama
+  #   environment:
+  #     - OLLAMA_HOST=0.0.0.0
+  #   networks:
+  #     - okami-network
+  #   restart: always
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '2'
+  #         memory: 4G
+
+  # Optional: Monitoring with Prometheus Node Exporter
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: okami-node-exporter
+    expose:
+      - "9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
     networks:
       - okami-network
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 128M
 
 volumes:
   chroma-data:
     driver: local
+  nginx-cache:
+    driver: local
+  nginx-logs:
+    driver: local
+  # ollama-data:
+  #   driver: local
 
 networks:
   okami-network:

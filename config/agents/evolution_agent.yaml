@@ -12,9 +12,9 @@ evolution_agent:
   max_iter: 20
   allow_delegation: false
   knowledge_sources: []
-  tools:
-    - mcp
-    - docker
+  # tools:
+  #   - mcp
+  #   - docker
   
 
 
