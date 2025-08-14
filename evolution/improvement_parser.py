@@ -133,70 +133,129 @@ class ImprovementParser:
         }
         
         try:
-            # JSONブロックを検索（単純で信頼性の高いパターン）
-            json_blocks = re.findall(r'\{.*?\}', evolution_result, re.DOTALL)
+            # まず、"changes"キーを含むJSONオブジェクトを探す
+            changes_pattern = r'"changes"\s*:\s*\[(.*?)\]'
+            changes_match = re.search(changes_pattern, evolution_result, re.DOTALL)
             
-            for json_block in json_blocks:
-                try:
-                    # JSON解析を試みる（制御文字の処理）
-                    data = json.loads(json_block)
-                except json.JSONDecodeError:
-                    # 失敗した場合、文字列フィールド内の制御文字のみエスケープを試みる
+            if changes_match:
+                changes_content = changes_match.group(1)
+                logger.debug(f"Found changes content: {changes_content[:200]}...")
+                
+                # 個々のchangeオブジェクトを抽出（ネストされたオブジェクトに対応）
+                # より堅牢なJSON抽出：括弧のバランスを考慮
+                json_objects = self._extract_balanced_json_objects(changes_content)
+                
+                for json_str in json_objects:
                     try:
-                        import re as regex_module
-                        # "content": "..." の部分の改行をエスケープ
-                        def fix_content(match):
-                            content = match.group(1)
-                            content = content.replace('\n', '\\n').replace('\r', '\\r')
-                            return f'"content": "{content}"'
-                        
-                        fixed_json = regex_module.sub(
-                            r'"content":\s*"([^"]*)"',
-                            fix_content,
-                            json_block
-                        )
-                        data = json.loads(fixed_json)
-                    except:
-                        continue
-                    
-                    # 単一のアクションオブジェクトの場合
-                    if isinstance(data, dict) and "type" in data:
+                        data = json.loads(json_str)
                         action = self._process_single_action(data)
                         if action:
                             category, improvement = action
                             improvements[category].append(improvement)
-                    
-                    # アクションの配列の場合
-                    elif isinstance(data, list):
-                        for item in data:
-                            if isinstance(item, dict) and "type" in item:
-                                action = self._process_single_action(item)
-                                if action:
-                                    category, improvement = action
-                                    improvements[category].append(improvement)
-                    
-                    # improvementsキーを持つオブジェクトの場合
-                    elif isinstance(data, dict) and "improvements" in data:
-                        improvements_list = data["improvements"]
-                        if isinstance(improvements_list, list):
-                            for item in improvements_list:
+                            logger.debug(f"Processed action: {category} - {improvement}")
+                    except json.JSONDecodeError as e:
+                        logger.debug(f"Failed to parse JSON object: {json_str[:100]}... Error: {e}")
+                        continue
+            
+            # "changes"キーがない場合、従来の方法も試す
+            if not any(improvements.values()):
+                # JSONブロックを検索（改善版：バランスの取れた括弧を探す）
+                json_objects = self._extract_balanced_json_objects(evolution_result)
+                
+                for json_str in json_objects:
+                    try:
+                        data = json.loads(json_str)
+                        
+                        # 単一のアクションオブジェクトの場合
+                        if isinstance(data, dict) and "type" in data:
+                            action = self._process_single_action(data)
+                            if action:
+                                category, improvement = action
+                                improvements[category].append(improvement)
+                        
+                        # changesキーを持つオブジェクトの場合
+                        elif isinstance(data, dict) and "changes" in data:
+                            changes_list = data["changes"]
+                            if isinstance(changes_list, list):
+                                for item in changes_list:
+                                    if isinstance(item, dict) and "type" in item:
+                                        action = self._process_single_action(item)
+                                        if action:
+                                            category, improvement = action
+                                            improvements[category].append(improvement)
+                        
+                        # アクションの配列の場合
+                        elif isinstance(data, list):
+                            for item in data:
                                 if isinstance(item, dict) and "type" in item:
                                     action = self._process_single_action(item)
                                     if action:
                                         category, improvement = action
                                         improvements[category].append(improvement)
-                                        
-                except json.JSONDecodeError:
-                    continue
+                        
+                        # improvementsキーを持つオブジェクトの場合
+                        elif isinstance(data, dict) and "improvements" in data:
+                            improvements_list = data["improvements"]
+                            if isinstance(improvements_list, list):
+                                for item in improvements_list:
+                                    if isinstance(item, dict) and "type" in item:
+                                        action = self._process_single_action(item)
+                                        if action:
+                                            category, improvement = action
+                                            improvements[category].append(improvement)
+                                            
+                    except json.JSONDecodeError as e:
+                        logger.debug(f"Failed to parse JSON: {json_str[:100]}... Error: {e}")
+                        continue
             
             # 何か見つかった場合のみ返す
             if any(improvements.values()):
+                logger.info(f"Extracted JSON actions: {sum(len(v) for v in improvements.values())} total")
                 return improvements
             
         except Exception as e:
             logger.debug("Failed to extract JSON actions", error=str(e))
         
         return None
+    
+    def _extract_balanced_json_objects(self, text: str) -> List[str]:
+        """バランスの取れた括弧を持つJSONオブジェクトを抽出"""
+        json_objects = []
+        
+        # JSONオブジェクトの開始位置を探す
+        i = 0
+        while i < len(text):
+            if text[i] == '{':
+                # 括弧のバランスを追跡
+                bracket_count = 1
+                j = i + 1
+                in_string = False
+                escape_next = False
+                
+                while j < len(text) and bracket_count > 0:
+                    if escape_next:
+                        escape_next = False
+                    elif text[j] == '\\':
+                        escape_next = True
+                    elif text[j] == '"' and not escape_next:
+                        in_string = not in_string
+                    elif not in_string:
+                        if text[j] == '{':
+                            bracket_count += 1
+                        elif text[j] == '}':
+                            bracket_count -= 1
+                    j += 1
+                
+                if bracket_count == 0:
+                    json_str = text[i:j]
+                    json_objects.append(json_str)
+                    i = j
+                else:
+                    i += 1
+            else:
+                i += 1
+        
+        return json_objects
     
     def _process_single_action(self, action: Dict[str, Any]) -> Optional[Tuple[str, Dict[str, Any]]]:
         """単一のJSONアクションを処理"""
@@ -406,18 +465,24 @@ class ImprovementParser:
     ) -> List[Tuple[str, str, Dict[str, Any]]]:
         """
         改善を実行可能な変更に変換
+        注: 知識ファイルのみが変更対象となります。
         
         Returns:
             (file_path, action, changes)タプルのリスト
         """
         actions = []
+        proposed_config_changes = []  # 提案されたconfig変更を記録
         
-        # 知識ファイルの変更
+        # 知識ファイルの変更のみを処理
         for improvement in improvements.get("knowledge", []):
             if isinstance(improvement, dict):
                 action = improvement.get("action", "update")
                 content = improvement.get("content", "")
                 file_path = improvement.get("file", "knowledge/general.md")
+                
+                # knowledge/で始まることを確認
+                if not file_path.startswith("knowledge/"):
+                    file_path = f"knowledge/{file_path}"
                 
                 actions.append((
                     file_path,
@@ -425,7 +490,7 @@ class ImprovementParser:
                     {"content": content}
                 ))
         
-        # エージェント設定の変更
+        # エージェント設定の変更は知識ファイルに記録
         for improvement in improvements.get("agents", []):
             if isinstance(improvement, dict):
                 agent = improvement.get("agent", "")
@@ -433,42 +498,83 @@ class ImprovementParser:
                 value = improvement.get("value")
                 
                 if agent and field:
+                    # config変更の代わりに、知識ファイルに提案を記録
+                    proposed_config_changes.append({
+                        "type": "agent_config",
+                        "agent": agent,
+                        "field": field,
+                        "value": value,
+                        "original_path": f"config/agents/{agent}.yaml"
+                    })
+                    
+                    # エージェント固有の知識ファイルに改善提案を追加
+                    knowledge_content = f"\n### Configuration Improvement Suggestion\n" \
+                                      f"- Field: {field}\n" \
+                                      f"- Suggested Value: {value}\n" \
+                                      f"- Reason: Agent performance optimization\n"
+                    
                     actions.append((
-                        f"config/agents/{agent}.yaml",
-                        "update_field",
-                        {"field": field, "value": value}
+                        f"knowledge/agents/{agent}.md",
+                        "update",
+                        {"content": knowledge_content}
                     ))
         
-        # タスク設定の変更
+        # タスク設定の変更も知識ファイルに記録
         for improvement in improvements.get("tasks", []):
             if isinstance(improvement, dict):
                 task = improvement.get("task", "")
                 change = improvement.get("improvement", "")
                 
                 if task:
+                    # config変更の代わりに、知識ファイルに提案を記録
+                    proposed_config_changes.append({
+                        "type": "task_config",
+                        "task": task,
+                        "change": change,
+                        "original_path": f"config/tasks/{task}.yaml"
+                    })
+                    
+                    # タスク関連の知識ファイルに改善提案を追加
+                    knowledge_content = f"\n### Task Improvement Suggestion\n" \
+                                      f"- Task: {task}\n" \
+                                      f"- Improvement: {change}\n"
+                    
                     actions.append((
-                        f"config/tasks/{task}.yaml",
+                        f"knowledge/crew/task_improvements.md",
                         "update",
-                        {"change": change}
+                        {"content": knowledge_content}
                     ))
         
-        # 設定変更
+        # 設定変更も知識ファイルに記録
         for improvement in improvements.get("config", []):
             if isinstance(improvement, dict):
                 config_type = improvement.get("type", "")
                 change = improvement.get("change", "")
                 
-                if config_type == "memory":
-                    actions.append((
-                        "config/crews/main_crew.yaml",
-                        "update_field",
-                        {"field": "memory", "value": "enable" in change}
-                    ))
-                elif config_type == "cache":
-                    actions.append((
-                        "config/crews/main_crew.yaml",
-                        "update_field",
-                        {"field": "cache", "value": "enable" in change}
-                    ))
+                proposed_config_changes.append({
+                    "type": "system_config",
+                    "config_type": config_type,
+                    "change": change,
+                    "original_path": "config/crews/main_crew.yaml"
+                })
+                
+                # システム設定の知識ファイルに改善提案を追加
+                knowledge_content = f"\n### System Configuration Suggestion\n" \
+                                  f"- Config Type: {config_type}\n" \
+                                  f"- Suggested Change: {change}\n"
+                
+                actions.append((
+                    f"knowledge/system/config_suggestions.md",
+                    "update",
+                    {"content": knowledge_content}
+                ))
+        
+        # 提案されたconfig変更をログに記録
+        if proposed_config_changes:
+            logger.info(
+                "Config changes proposed but not applied",
+                count=len(proposed_config_changes),
+                changes=proposed_config_changes
+            )
         
         return actions

@@ -1,40 +1,126 @@
 evolution_task:
   description: |
-    Analyze system performance metrics and agent behaviors to
-    identify evolution opportunities. Generate actionable insights
-    for system improvement and adaptation.
+    You are a Knowledge Evolution Specialist responsible for systematically analyzing crew interactions 
+    to extract, refine, and organize valuable knowledge. Your task is to continuously improve the 
+    knowledge base by identifying patterns, capturing insights, and updating existing documentation.
     
+    === CONTEXT FOR ANALYSIS ===
     User Input: {user_input}
     
     Main Crew Response: {main_response}
     
-    You MUST output improvements in the following JSON format:
+    === PRIMARY OBJECTIVES ===
+    
+    1. **Knowledge Extraction and Categorization**
+       - Extract actionable insights and patterns from the interaction
+       - Classify knowledge into appropriate categories based on content and purpose
+       - Ensure knowledge is structured, searchable, and reusable
+    
+    2. **Existing Knowledge Enhancement**
+       - PRIORITY: First check for existing knowledge files in crew/ and agents/ directories
+       - Update existing files rather than creating duplicates
+       - Enhance crew-level best practices (knowledge/crew/*.md)
+       - Refine agent-specific guidelines (knowledge/agents/*.md)
+       - Maintain consistency with current knowledge structure
+    
+    3. **Knowledge Gap Identification**
+       - Identify areas where documentation is missing or insufficient
+       - Detect recurring patterns that should be documented
+       - Note edge cases and error scenarios for future reference
+    
+    === KNOWLEDGE CATEGORIES ===
+    
+    - **crew/** : Shared knowledge for all agents (best practices, workflows, standards)
+    - **agents/** : Agent-specific expertise (research_agent.md, analysis_agent.md, etc.)
+    - **domain/** : Domain-specific knowledge (industry insights, technical specs)
+    - **general/** : General reference information (glossaries, FAQs, common patterns)
+    - **system/** : System-level documentation (architecture, integration points)
+    
+    === CRITICAL REQUIREMENTS ===
+    
+    1. **Prioritize Updates Over Additions**
+       - ALWAYS check if relevant knowledge files already exist
+       - Prefer updating existing sections to creating new files
+       - Merge related knowledge into existing documents
+    
+    2. **Maintain Knowledge Quality**
+       - Use clear, structured Markdown formatting
+       - Include concrete examples and code snippets where applicable
+       - Add cross-references between related knowledge pieces
+       - Ensure knowledge is immediately actionable
+    
+    3. **Structured Output Format**
+       You MUST output improvements in the following JSON format:
+       ```json
+       {
+         "changes": [
+           {
+             "type": "add_knowledge",
+             "category": "agents|crew|system|domain|general",
+             "file": "knowledge/category/filename.md",
+             "title": "Descriptive Knowledge Title",
+             "content": "## Title\n\nStructured markdown content with sections...",
+             "tags": ["relevant", "searchable", "tags"],
+             "reason": "Specific value this knowledge provides to the system"
+           },
+           {
+             "type": "update_knowledge",
+             "file": "knowledge/crew/existing_file.md",
+             "section": "## Specific Section Name",
+             "content": "Enhanced or additional content to merge",
+             "operation": "append|replace|insert",
+             "reason": "How this update improves existing knowledge"
+           }
+         ]
+       }
+       ```
+    
+    === ANALYSIS METHODOLOGY ===
+    
+    1. Review the interaction for successful strategies and approaches
+    2. Identify any challenges encountered and solutions applied
+    3. Extract reusable patterns, templates, or workflows
+    4. Note any new tools, techniques, or integrations discovered
+    5. Document error handling and edge cases
+    6. Capture performance optimizations or efficiency improvements
+  
+  expected_output: |
+    A meticulously structured JSON object containing knowledge evolution directives.
+    
+    The output MUST be a valid JSON with the following structure:
     ```json
     {
       "changes": [
-        {
-          "type": "update_agent_parameter",
-          "agent": "agent_name",
-          "parameter": "parameter_name",
-          "value": new_value,
-          "reason": "reason for change"
-        },
-        {
-          "type": "add_knowledge",
-          "file": "knowledge/filename.md",
-          "content": "content to add",
-          "reason": "reason for addition"
-        }
+        // Array of knowledge change objects
       ]
     }
     ```
-  
-  expected_output: |
-    A JSON object with the following structure:
-    {
-      "changes": [array of improvement items]
-    }
-    Each change must include: type, agent/file, parameter/content, value, and reason
+    
+    Each change object MUST include ALL required fields:
+    
+    **For Adding New Knowledge (type: "add_knowledge")**:
+    - `type`: "add_knowledge" (string, required)
+    - `category`: One of "agents", "crew", "system", "domain", "general" (string, required)
+    - `file`: Full path like "knowledge/crew/new_practice.md" (string, required)
+    - `title`: Descriptive title for the knowledge (string, required)
+    - `content`: Well-formatted Markdown content with proper headers and sections (string, required)
+    - `tags`: Array of relevant searchable tags (array of strings, required)
+    - `reason`: Clear explanation of why this knowledge adds value (string, required)
+    
+    **For Updating Existing Knowledge (type: "update_knowledge")**:
+    - `type`: "update_knowledge" (string, required)
+    - `file`: Path to existing file like "knowledge/agents/research_agent.md" (string, required)
+    - `section`: Exact section header to update, e.g., "## Research Methodology" (string, required)
+    - `content`: New or updated content in Markdown format (string, required)
+    - `operation`: One of "append", "replace", "insert" (string, required)
+    - `reason`: Justification for the update with specific improvements (string, required)
+    
+    **Quality Criteria**:
+    - Prioritize updating existing knowledge files over creating new ones
+    - Content must be immediately actionable and practical
+    - Include specific examples, code snippets, or templates where relevant
+    - Maintain consistency with existing knowledge structure and style
+    - Each change must demonstrably improve system capabilities
   
   output_json: EvolutionChanges
   

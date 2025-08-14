@@ -5,7 +5,7 @@ CrewAIのStringKnowledgeSourceと互換性のあるQdrant実装
 
 from typing import Dict, Any, Optional
 from crewai.knowledge.source.string_knowledge_source import StringKnowledgeSource
-from knowledge.qdrant_knowledge_source import QdrantKnowledgeStorage
+from core.knowledge_sources.qdrant_knowledge_source import QdrantKnowledgeStorage
 from core.embedding_manager import get_embedding_manager
 import structlog
 

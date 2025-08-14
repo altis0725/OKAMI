@@ -57,7 +57,7 @@ class CrewFactory:
         self._knowledge_manager = None
         self._initialize_knowledge_manager()
         
-        # MemoryManagerの初期化（グラフメモリ対応）
+        # MemoryManagerの初期化（グラフメモリ対応、シンプル版）
         self.memory_manager = MemoryManager(use_graph_memory=True)
         
         # KnowledgeGraphIntegrationの初期化
@@ -426,7 +426,7 @@ class CrewFactory:
                 }
             }
             
-            # Knowledge sourcesの処理（Qdrantを使わないため簡素化）
+            # Knowledge sourcesの処理（Qdrantを使わないため簡素化、バックアップ版の復元）
             knowledge_sources = []
             if config.get("knowledge_sources"):
                 # 共有KnowledgeManagerインスタンスを使用
@@ -458,10 +458,10 @@ class CrewFactory:
             config.setdefault("cache", True)
             config.setdefault("verbose", True)
             
-            # embedder設定を追加（Qdrantを使わない設定）
+            # embedder設定を追加（Qdrantを使わない設定、バックアップ版の復元）
             config["embedder"] = embedder_config
             
-            # mem0を使用する場合は、external_memoryとして設定
+            # mem0を使用する場合は、external_memoryとして設定（バックアップ版の復元）
             memory_config = config.get("memory_config", {})
             mem0_config = config.get("mem0_config", {})
             
@@ -575,7 +575,8 @@ class CrewFactory:
                 agents=len(agents),
                 tasks=len(tasks),
                 process=process_str,
-                knowledge_sources=len(knowledge_sources)
+                knowledge_sources=len(knowledge_sources),
+
             )
             
             return crew

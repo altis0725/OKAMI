@@ -6,10 +6,13 @@
 import os
 import yaml
 import re
+import json
 from typing import Dict, List, Any, Tuple, Optional
 from pathlib import Path
 from datetime import datetime
 import structlog
+import traceback
+from evolution.knowledge_applier import KnowledgeApplier
 
 logger = structlog.get_logger()
 
@@ -21,6 +24,8 @@ class ImprovementApplier:
         self.base_path = Path(base_path)
         self.backup_dir = self.base_path / "evolution" / "backups"
         self.backup_dir.mkdir(parents=True, exist_ok=True)
+        # 知識管理専用Applierのインスタンス化
+        self.knowledge_applier = KnowledgeApplier(self.base_path / "knowledge")
     
     def apply_changes(
         self,
@@ -29,6 +34,7 @@ class ImprovementApplier:
     ) -> Dict[str, Any]:
         """
         ファイルに変更リストを適用
+        注: knowledgeディレクトリのファイルのみが変更対象となります。
         
         Args:
             changes: (file_path, action, changes)タプルのリスト
@@ -40,48 +46,145 @@ class ImprovementApplier:
         results = {
             "applied": [],
             "failed": [],
-            "skipped": []
+            "skipped": [],
+            "blocked_config_changes": []  # ブロックされたconfig変更を記録
         }
         
+        # 提案されたconfig変更を保存するリスト
+        proposed_config_changes = []
+        
+        # 知識関連の変更のみを処理
+        knowledge_changes = []
+        
         for file_path, action, change_data in changes:
-            try:
-                result = self._apply_single_change(
-                    file_path,
-                    action,
-                    change_data,
-                    dry_run
-                )
-                
-                if result["status"] == "applied":
-                    results["applied"].append(result)
-                elif result["status"] == "failed":
-                    results["failed"].append(result)
-                else:
-                    results["skipped"].append(result)
-                    
-            except Exception as e:
-                logger.error(
-                    "Failed to apply change",
-                    file=file_path,
-                    action=action,
-                    error=str(e)
-                )
-                results["failed"].append({
+            if file_path.startswith("knowledge/"):
+                # 知識ファイルの変更はKnowledgeApplierに委譲
+                knowledge_changes.append((file_path, action, change_data))
+            else:
+                # knowledge以外のファイルへの変更はブロック
+                blocked_change = {
                     "file": file_path,
                     "action": action,
-                    "error": str(e),
-                    "status": "failed"
-                })
+                    "changes": change_data,
+                    "status": "blocked",
+                    "reason": "Only knowledge directory files can be modified"
+                }
+                results["blocked_config_changes"].append(blocked_change)
+                results["skipped"].append(blocked_change)
+                
+                # config変更の場合は提案として記録
+                if file_path.startswith("config/"):
+                    proposed_config_changes.append({
+                        "file_path": file_path,
+                        "action": action,
+                        "changes": change_data,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    
+                logger.warning(
+                    "Blocked non-knowledge file modification",
+                    file=file_path,
+                    action=action,
+                    reason="Only knowledge directory files can be modified"
+                )
+        
+        # 知識変更の処理
+        if knowledge_changes:
+            knowledge_results = self._apply_knowledge_changes(knowledge_changes, dry_run)
+            results["applied"].extend(knowledge_results.get("applied", []))
+            results["failed"].extend(knowledge_results.get("failed", []))
+            results["skipped"].extend(knowledge_results.get("skipped", []))
+        
+        # 提案されたconfig変更をファイルに保存
+        if proposed_config_changes and not dry_run:
+            self._save_proposed_config_changes(proposed_config_changes)
         
         logger.info(
             "Changes applied",
             applied=len(results["applied"]),
             failed=len(results["failed"]),
             skipped=len(results["skipped"]),
+            blocked=len(results["blocked_config_changes"]),
             dry_run=dry_run
         )
         
         return results
+    
+    def _apply_knowledge_changes(
+        self,
+        knowledge_changes: List[Tuple[str, str, Dict[str, Any]]],
+        dry_run: bool
+    ) -> Dict[str, Any]:
+        """知識関連の変更をKnowledgeApplierで処理"""
+        results = {
+            "applied": [],
+            "failed": [],
+            "skipped": []
+        }
+        
+        # KnowledgeApplier用のフォーマットに変換
+        formatted_changes = []
+        for file_path, action, change_data in knowledge_changes:
+            if action == "add":
+                formatted_change = {
+                    "type": "add_knowledge",
+                    "file": file_path,
+                    "content": change_data.get("content", ""),
+                    "category": self._detect_category(file_path),
+                    "title": change_data.get("title", self._extract_title(change_data.get("content", ""))),
+                    "tags": change_data.get("tags", []),
+                    "reason": change_data.get("reason", "Added by Evolution System")
+                }
+            elif action == "update":
+                formatted_change = {
+                    "type": "update_knowledge",
+                    "file": file_path,
+                    "content": change_data.get("change", change_data.get("content", "")),
+                    "section": change_data.get("section"),
+                    "operation": "append",
+                    "reason": change_data.get("reason", "Updated by Evolution System")
+                }
+            else:
+                continue
+            
+            formatted_changes.append(formatted_change)
+        
+        # KnowledgeApplierで処理
+        if formatted_changes:
+            applier_results = self.knowledge_applier.apply_knowledge_changes(formatted_changes, dry_run)
+            
+            # 結果を統合
+            for result in applier_results:
+                if result["status"] == "success":
+                    results["applied"].append(result)
+                elif result["status"] == "error":
+                    results["failed"].append(result)
+                else:
+                    results["skipped"].append(result)
+        
+        return results
+    
+    def _detect_category(self, file_path: str) -> str:
+        """ファイルパスからカテゴリを検出"""
+        if "agents" in file_path:
+            return "agents"
+        elif "crew" in file_path:
+            return "crew"
+        elif "system" in file_path:
+            return "system"
+        elif "domain" in file_path:
+            return "domain"
+        else:
+            return "general"
+    
+    def _extract_title(self, content: str) -> str:
+        """コンテンツからタイトルを抽出"""
+        lines = content.split('\n')
+        for line in lines:
+            if line.strip():
+                # 最初の非空行をタイトルとして使用
+                return line.strip()[:50]  # 最大50文字
+        return "Untitled Knowledge"
     
     def _apply_single_change(
         self,
@@ -131,7 +234,28 @@ class ImprovementApplier:
                 "reason": "No content provided"
             }
         
+        # contentがファイルパスのように見える場合の処理
+        # (例: "file": "knowledge/xxx.md" という文字列が誤ってcontentとして渡される場合)
+        if content.startswith('"file"'):
+            logger.warning(
+                "Content looks like a file path, skipping",
+                file=str(file_path),
+                content=content[:100]
+            )
+            return {
+                "file": str(file_path),
+                "action": "add",
+                "status": "skipped",
+                "reason": "Content appears to be a file path, not actual content"
+            }
+        
         try:
+            # general.mdへの更新はevolution履歴用のファイルにリダイレクト
+            if file_path.name == "general.md" and "Evolution Update" in content:
+                # Evolution履歴専用ファイルにリダイレクト
+                file_path = file_path.parent / "evolution_history.md"
+                logger.info("Redirecting evolution history to dedicated file", file=str(file_path))
+            
             if file_path.suffix == ".md":
                 # Markdownファイルの場合
                 existing = ""
@@ -141,14 +265,38 @@ class ImprovementApplier:
                     existing = file_path.read_text(encoding="utf-8")
                 else:
                     is_new_file = True
+                    # ディレクトリが存在しない場合は作成
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
                 
                 if is_new_file:
                     # 新しいファイルを作成
-                    new_content = f"# {file_path.stem.replace('_', ' ').title()}\n\n{content}\n\n---\n*Generated by OKAMI Evolution System on {datetime.now().isoformat()}*\n"
+                    if file_path.name == "evolution_history.md":
+                        # Evolution履歴ファイルの場合
+                        new_content = f"""# OKAMI Evolution History
+
+This file contains the evolution history of the OKAMI system.
+Each entry represents an improvement or change made by the Evolution System.
+
+---
+
+## Evolution Update - {datetime.now().isoformat()}
+
+{content}
+
+---
+*Generated by OKAMI Evolution System*
+"""
+                    else:
+                        # 通常の新規ファイル
+                        new_content = f"# {file_path.stem.replace('_', ' ').title()}\n\n{content}\n\n---\n*Generated by OKAMI Evolution System on {datetime.now().isoformat()}*\n"
                     
                     if not dry_run:
-                        file_path.parent.mkdir(parents=True, exist_ok=True)
                         file_path.write_text(new_content, encoding="utf-8")
+                        logger.info(
+                            "Created new file",
+                            file=str(file_path),
+                            size=len(new_content)
+                        )
                     
                     return {
                         "file": str(file_path),
@@ -163,6 +311,11 @@ class ImprovementApplier:
                     
                     if not dry_run:
                         file_path.write_text(existing + new_content, encoding="utf-8")
+                        logger.info(
+                            "Updated existing file",
+                            file=str(file_path),
+                            content_added=len(new_content)
+                        )
                     
                     return {
                         "file": str(file_path),
@@ -177,6 +330,12 @@ class ImprovementApplier:
                 return self._apply_yaml_add(file_path, content, dry_run)
                 
         except Exception as e:
+            logger.error(
+                "Failed to apply add",
+                file=str(file_path),
+                error=str(e),
+                traceback=traceback.format_exc()
+            )
             return {
                 "file": str(file_path),
                 "action": "add",
@@ -466,6 +625,45 @@ class ImprovementApplier:
         )
         
         return backup_path
+    
+    def _save_proposed_config_changes(self, changes: List[Dict[str, Any]]) -> None:
+        """
+        提案されたconfig変更を記録ファイルに保存
+        
+        Args:
+            changes: 提案された変更のリスト
+        """
+        try:
+            # 提案ファイルのパス
+            proposals_dir = self.base_path / "evolution" / "proposed_changes"
+            proposals_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 既存の提案を読み込み
+            proposals_file = proposals_dir / "config_proposals.json"
+            if proposals_file.exists():
+                with open(proposals_file, "r", encoding="utf-8") as f:
+                    existing_proposals = json.load(f)
+            else:
+                existing_proposals = []
+            
+            # 新しい提案を追加
+            existing_proposals.extend(changes)
+            
+            # ファイルに保存
+            with open(proposals_file, "w", encoding="utf-8") as f:
+                json.dump(existing_proposals, f, indent=2, ensure_ascii=False)
+            
+            logger.info(
+                "Saved proposed config changes",
+                count=len(changes),
+                file=str(proposals_file)
+            )
+            
+        except Exception as e:
+            logger.error(
+                "Failed to save proposed config changes",
+                error=str(e)
+            )
     
     def restore_backup(self, file_path: str, backup_time: Optional[str] = None) -> bool:
         """バックアップからファイルを復元"""

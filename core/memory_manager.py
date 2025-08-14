@@ -1,25 +1,26 @@
 """
 OKAMIシステム用メモリマネージャ
 短期・長期・エンティティメモリ管理（Mem0対応）
+CrewAI 0.157.0対応版 - ExternalMemoryへの移行とエラー許容モード実装
 """
 
 import os
+import logging
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 import structlog
-from crewai.memory import LongTermMemory
-from crewai.memory.storage.ltm_sqlite_storage import LTMSQLiteStorage
 from crewai.memory.external.external_memory import ExternalMemory
 from crewai.utilities.paths import db_storage_path
 
 from .graph_memory_manager import GraphMemoryManager
 from .knowledge_graph_integration import KnowledgeGraphIntegration
+from utils.mem0_helper import mem0_error_handler, Mem0StatusChecker
 
 logger = structlog.get_logger()
 
 
 class MemoryManager:
-    """OKAMIエージェントの全メモリを管理するクラス"""
+    """OKAMIエージェントの全メモリを管理するクラス（CrewAI 0.157.0対応）"""
 
     def __init__(
         self,
@@ -27,6 +28,7 @@ class MemoryManager:
         use_mem0: bool = False,
         mem0_config: Optional[Dict[str, Any]] = None,
         use_graph_memory: bool = True,
+        fallback_to_basic: bool = True,
     ):
         """
         メモリマネージャの初期化
@@ -36,19 +38,22 @@ class MemoryManager:
             use_mem0: Mem0高度メモリ利用有無
             mem0_config: Mem0設定
             use_graph_memory: グラフメモリを使用するか
+            fallback_to_basic: Mem0エラー時に基本メモリにフォールバックするか
         """
         self.storage_path = storage_path or db_storage_path()
         self.use_mem0 = use_mem0
         self.mem0_config = mem0_config or {}
         self.use_graph_memory = use_graph_memory
+        self.fallback_to_basic = fallback_to_basic
+        self.external_memory = None
+        self.mem0_initialized = False
 
         # Ensure storage directory exists
         Path(self.storage_path).mkdir(parents=True, exist_ok=True)
 
-        # Initialize memory components
-        self._init_short_term_memory()
-        self._init_long_term_memory()
-        self._init_external_memory()
+        # Initialize external memory only if mem0 is enabled
+        if self.use_mem0:
+            self._init_external_memory_with_fallback()
         
         # Initialize graph memory if enabled
         if self.use_graph_memory:
@@ -66,118 +71,152 @@ class MemoryManager:
             "Memory Manager initialized",
             storage_path=self.storage_path,
             use_mem0=self.use_mem0,
+            mem0_initialized=self.mem0_initialized,
+            fallback_mode=not self.mem0_initialized and self.fallback_to_basic
         )
 
-    def _init_short_term_memory(self) -> None:
-        """短期メモリ初期化（Qdrantを使わないため無効化）"""
-        # Qdrantを使わないため、ShortTermMemoryは初期化しない
-        self.short_term_memory = None
-
-    def _init_long_term_memory(self) -> None:
-        """長期メモリ初期化（Qdrantを使わないため無効化）"""
-        # Qdrantを使わないため、LongTermMemoryは初期化しない
-        self.long_term_memory = None
-
-    def _init_external_memory(self) -> None:
-        """外部メモリ（Mem0）初期化"""
-        if self.use_mem0 and os.getenv("MEM0_API_KEY"):
-            try:
-                self.external_memory = ExternalMemory(
-                    embedder_config={
-                        "provider": "huggingface",
-                        "config": {
-                            "model": "sentence-transformers/all-MiniLM-L6-v2"
-                        }
-                    },
-                    memory_config={
-                        "provider": "mem0",
-                        "config": {
-                            "user_id": self.mem0_config.get("user_id", "okami_system"),
-                            "org_id": self.mem0_config.get("org_id"),
-                            "project_id": self.mem0_config.get("project_id"),
-                            "api_key": os.getenv("MEM0_API_KEY")
-                        }
-                    }
-                )
-                logger.info("Mem0 external memory initialized successfully")
-            except Exception as e:
-                logger.error(f"Failed to initialize Mem0: {e}")
-                self.external_memory = None
-        else:
-            self.external_memory = None
-
-    def get_memory_config(self) -> Dict[str, Any]:
-        """CrewAI用メモリ設定を取得（Qdrantを使わずにmem0のみ使用）"""
-        config = {
-            "memory": True,
-        }
-
-        if self.use_mem0:
-            # ExternalMemoryを使用する設定（embedderはollama、memoryはmem0）
-            from crewai.memory.external.external_memory import ExternalMemory
+    def _init_external_memory_with_fallback(self) -> None:
+        """外部メモリ（Mem0）初期化（エラー許容モード）"""
+        if not self.use_mem0:
+            logger.info("Mem0 disabled by configuration")
+            return
             
-            external_memory = ExternalMemory(
+        mem0_api_key = os.getenv("MEM0_API_KEY")
+        
+        if not mem0_api_key:
+            logger.warning("MEM0_API_KEY not found. Using limited memory features.")
+            return
+        
+        try:
+            # ExternalMemory（新方式）での初期化を試みる - V2 API対応
+            self.external_memory = ExternalMemory(
                 embedder_config={
-                    "provider": "huggingface",
+                    "provider": "ollama",
                     "config": {
-                        "model": "sentence-transformers/all-MiniLM-L6-v2"
+                        "model": "nomic-embed-text:latest",
+                        "base_url": "http://localhost:11434"
                     }
                 },
                 memory_config={
                     "provider": "mem0",
                     "config": {
                         "user_id": self.mem0_config.get("user_id", "okami_system"),
+                        "run_id": self.mem0_config.get("run_id"),
                         "org_id": self.mem0_config.get("org_id"),
                         "project_id": self.mem0_config.get("project_id"),
-                        "api_key": os.getenv("MEM0_API_KEY")
+                        "api_key": mem0_api_key,
+                        # V2 API対応の追加設定
+                        "api_version": "v2"
                     }
                 }
             )
+            self.mem0_initialized = True
+            logger.info("Mem0 ExternalMemory initialized successfully (V2 API)")
             
-            config["memory"] = True
-            config["external_memory"] = external_memory
+        except Exception as e:
+            logger.error(f"Mem0 initialization failed: {e}")
+            
+            # フォールバック1: ローカルMem0設定を試す
+            if self.mem0_config.get("local_mem0_config"):
+                self._try_local_mem0()
+            
+            # フォールバック2: 基本メモリで継続
+            elif self.fallback_to_basic:
+                logger.warning("Continuing with basic memory provider")
+                self.external_memory = None
+                self.mem0_initialized = False
+    
+    def _try_local_mem0(self) -> None:
+        """ローカルMem0設定での初期化を試みる"""
+        try:
+            local_config = self.mem0_config.get("local_mem0_config", {})
+            
+            # Ollamaベースのローカル設定
+            self.external_memory = ExternalMemory(
+                embedder_config={
+                    "provider": local_config.get("embedder", {}).get("provider", "ollama"),
+                    "config": local_config.get("embedder", {}).get("config", {
+                        "model": "nomic-embed-text:latest",
+                        "base_url": "http://localhost:11434"
+                    })
+                },
+                memory_config={
+                    "provider": "mem0",
+                    "config": {
+                        **local_config.get("vector_store", {}).get("config", {}),
+                        "user_id": self.mem0_config.get("user_id", "okami_system"),
+                        "local_mode": True  # ローカルモードフラグ
+                    }
+                }
+            )
+            self.mem0_initialized = True
+            logger.info("Local Mem0 configuration applied successfully")
+            
+        except Exception as e:
+            logger.error(f"Local Mem0 setup failed: {e}")
+            self.external_memory = None
+            self.mem0_initialized = False
+
+    def get_crew_memory_config(self) -> Dict[str, Any]:
+        """Crew用のメモリ設定を取得（エラー許容モード対応）"""
+        if self.external_memory and self.mem0_initialized:
+            # ExternalMemoryが利用可能な場合
+            return {
+                "memory": True,
+                "external_memory": self.external_memory
+            }
         else:
-            # デフォルトのbasic memory設定（Qdrantを使わない）
-            config["memory_config"] = {
-                "provider": "basic",
-                "config": {},
-                "user_memory": {}
+            # 基本メモリプロバイダーを使用（フォールバック）
+            return {
+                "memory": True,
+                "memory_config": {"provider": "basic"}
             }
 
-        return config
+    def get_memory_config(self) -> Dict[str, Any]:
+        """CrewAI用メモリ設定を取得（後方互換性のため維持）"""
+        return self.get_crew_memory_config()
 
+    @mem0_error_handler
     def save_memory(self, key: str, value: str, metadata: Dict[str, Any] = None) -> bool:
-        """メモリを保存"""
-        try:
-            if self.external_memory:
-                # mem0のAPI形式に合わせてデータを整形
-                # mem0はExternalMemoryItemのリストを期待する
-                from crewai.memory.external.external_memory_item import ExternalMemoryItem
-                
-                memory_item = ExternalMemoryItem(
-                    content=value,
-                    metadata=metadata or {},
-                    key=key
-                )
-                
-                # リスト形式で保存
-                self.external_memory.save([memory_item])
-                return True
-            return False
-        except Exception as e:
-            self.logger.error(f"Failed to save memory: {e}")
-            return False
+        """メモリを保存（エラー許容）"""
+        if self.external_memory and self.mem0_initialized:
+            # mem0のAPI形式に合わせてデータを整形
+            from crewai.memory.external.external_memory_item import ExternalMemoryItem
+            
+            memory_item = ExternalMemoryItem(
+                content=value,
+                metadata=metadata or {},
+                key=key
+            )
+            
+            # リスト形式で保存
+            self.external_memory.save([memory_item])
+            return True
+        return False
 
+    @mem0_error_handler
     def search_memory(self, query: str, limit: int = 10, score_threshold: float = 0.5) -> List[Dict[str, Any]]:
-        """メモリを検索"""
-        try:
-            if self.external_memory:
-                results = self.external_memory.search(query, limit=limit, score_threshold=score_threshold)
+        """メモリを検索（エラー許容）"""
+        if self.external_memory and self.mem0_initialized:
+            # V2 API対応のパラメータ調整
+            try:
+                results = self.external_memory.search(
+                    query, 
+                    limit=limit, 
+                    score_threshold=score_threshold
+                )
                 return results
-            return []
-        except Exception as e:
-            self.logger.error(f"Failed to search memory: {e}")
-            return []
+            except TypeError as e:
+                # metadataパラメータエラーの場合、パラメータを調整して再試行
+                if "metadata" in str(e):
+                    logger.warning("Adjusting search parameters for V2 API compatibility")
+                    results = self.external_memory.search(
+                        query,
+                        limit=limit
+                    )
+                    return results
+                raise
+        return []
 
     def reset_memory(self, memory_type: str = "all") -> None:
         """
@@ -188,7 +227,8 @@ class MemoryManager:
         """
         try:
             if memory_type in ["all", "external"] and self.external_memory:
-                self.external_memory.reset()
+                if hasattr(self.external_memory, 'reset'):
+                    self.external_memory.reset()
             if memory_type in ["all", "graph"] and self.graph_memory:
                 # グラフメモリをリセット（新しいグラフで初期化）
                 import networkx as nx
@@ -257,7 +297,15 @@ class MemoryManager:
         Returns:
             拡張メモリ設定
         """
-        config = self.get_memory_config()
+        config = self.get_crew_memory_config()
+        
+        # Mem0ステータス情報を追加
+        config["mem0_status"] = {
+            "initialized": self.mem0_initialized,
+            "fallback_mode": not self.mem0_initialized and self.fallback_to_basic,
+            "api_key_present": bool(os.getenv("MEM0_API_KEY")),
+            "local_mode": bool(self.mem0_config.get("local_mem0_config"))
+        }
         
         if self.use_graph_memory and self.graph_memory:
             config["graph_memory"] = {
@@ -267,3 +315,18 @@ class MemoryManager:
             }
         
         return config
+    
+    def check_mem0_status(self) -> Dict[str, Any]:
+        """
+        Mem0の現在の状態を確認
+        
+        Returns:
+            ステータス情報
+        """
+        status = Mem0StatusChecker.check_mem0_availability()
+        status["memory_manager_state"] = {
+            "initialized": self.mem0_initialized,
+            "external_memory_active": self.external_memory is not None,
+            "fallback_active": not self.mem0_initialized and self.fallback_to_basic
+        }
+        return status

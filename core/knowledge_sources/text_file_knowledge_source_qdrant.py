@@ -5,7 +5,7 @@ QdrantベースのTextFileKnowledgeSource
 
 from typing import List, Dict, Any, Optional
 from crewai.knowledge.source.text_file_knowledge_source import TextFileKnowledgeSource
-from knowledge.qdrant_knowledge_source import QdrantKnowledgeStorage
+from core.knowledge_sources.qdrant_knowledge_source import QdrantKnowledgeStorage
 from core.embedding_manager import get_embedding_manager
 from pathlib import Path
 import structlog

@@ -1,0 +1,356 @@
+# OKAMI System Knowledge Base
+
+> **更新日**: 2025-08-05
+> **バージョン**: 2.0
+> **前バージョン**: general.md.backup
+
+## 目次
+1. [システム概要](#システム概要)
+2. [アーキテクチャ](#アーキテクチャ)
+3. [コアコンポーネント](#コアコンポーネント)
+4. [エージェント詳細](#エージェント詳細)
+5. [設定と使用方法](#設定と使用方法)
+6. [トラブルシューティング](#トラブルシューティング)
+7. [関連リソース](#関連リソース)
+
+## システム概要
+
+### OKAMIとは
+**OKAMI (Orchestrated Knowledge-driven Autonomous Multi-agent Intelligence)** は、CrewAIフレームワークをベースに構築された自己成長型AIエージェントシステムです。
+
+### 主要特徴
+- **自己進化機能**: Evolution Crewによる継続的な分析と改善
+- **階層型プロセス管理**: マネージャーエージェントによる効率的なタスク委譲
+- **高度な知識管理**: Qdrant/ChromaDBを使用したベクトル検索対応
+- **品質保証システム**: 多層的なガードレールによる出力品質の保証
+- **マルチLLMサポート**: Monica LLM（GPT-4o互換）+ Ollama埋め込み
+- **MCP統合**: Model Context Protocolによる外部ツール連携
+
+### システムの目的
+1. 複数のAIエージェントが協調して複雑なタスクを解決
+2. 経験から学習し、知識を蓄積・共有
+3. 時間とともに自動的に進化し、パフォーマンスを向上
+
+## アーキテクチャ
+
+### システム全体の流れ
+```
+ユーザー
+   ↓
+FastAPI (main.py)
+   ↓
+CrewFactory
+   ↓
+Crew実行
+   ├── エージェント群（YAML定義）
+   ├── タスク群（YAML定義）
+   └── マネージャー群
+       ├── MemoryManager（短期・長期記憶）
+       ├── KnowledgeManager（RAG対応）
+       ├── GuardrailManager（品質保証）
+       └── EvolutionTracker（進化追跡）
+   
+タスク完了後
+   ↓
+Evolution Crew
+   ↓
+改善分析
+   ↓
+ImprovementParser
+   ↓
+ImprovementApplier
+   ↓
+設定・知識更新
+```
+
+### プロセスタイプ
+1. **Sequential Process**: タスクを順番に実行
+2. **Hierarchical Process**: マネージャーエージェントが動的にタスクを割り当て
+
+### データフロー
+1. **入力処理**: FastAPIがユーザーリクエストを受信
+2. **クルー生成**: CrewFactoryが設定に基づいてクルーを動的生成
+3. **タスク実行**: エージェントが協調してタスクを実行
+4. **品質保証**: GuardrailManagerが出力を検証
+5. **記憶保存**: MemoryManagerが実行結果を保存
+6. **知識更新**: KnowledgeManagerが新しい知識を統合
+7. **進化分析**: Evolution Crewがパフォーマンスを分析
+8. **自動改善**: 改善提案が自動的に適用
+
+## コアコンポーネント
+
+### MemoryManager
+**役割**: 短期・長期記憶の統合管理
+
+**主要機能**:
+- CrewAI標準メモリプロバイダー（basic）の管理
+- Mem0外部メモリシステムとの統合（オプション）
+- SQLiteベースの永続的ストレージ
+- 会話コンテキストと学習結果の保存
+
+**使用例**:
+```python
+memory_manager = MemoryManager()
+memory_config = memory_manager.get_memory_config()  # CrewAI用設定
+memory_manager.save_memory(user_id, content, metadata)
+results = memory_manager.search_memory(query)
+```
+
+### KnowledgeManager
+**役割**: ベクトル検索対応の高度な知識管理
+
+**主要機能**:
+- ChromaDB/Qdrantによるベクトル検索
+- 知識の動的ロードと更新
+- エージェント・クルーレベルの知識注入
+- 知識グラフ機能（エンティティと関係の管理）
+
+**知識の階層**:
+1. **システムレベル**: 全クルーが共有する基本知識
+2. **クルーレベル**: 特定クルーが使用する専門知識
+3. **エージェントレベル**: 個別エージェントの専門知識
+
+### GuardrailManager
+**役割**: 出力品質の多層的な保証
+
+**ガードレールの種類**:
+1. **構造検証**: JSON/YAML形式の検証
+2. **幻覚検出**: コンテキストとの整合性チェック
+3. **機密情報保護**: PII情報のフィルタリング
+4. **品質スコアリング**: 出力の品質評価
+5. **カスタムルール**: プロジェクト固有の検証
+
+### EvolutionTracker
+**役割**: システムの進化と改善の追跡
+
+**主要機能**:
+- パフォーマンスメトリクスの収集
+- 改善パターンの識別
+- 進化履歴の記録
+- 改善効果の測定
+
+## エージェント詳細
+
+### 基本エージェント（6種類）
+
+#### 1. Research Agent（研究専門）
+- **強み**: 徹底的な調査と包括的なレポート作成
+- **使用場面**: 情報収集、市場調査、技術調査
+- **特徴**: max_iter: 30（深い調査が可能）
+
+#### 2. Analysis Agent（分析専門）
+- **強み**: データ分析とパターン認識
+- **使用場面**: 統計分析、トレンド分析、異常検出
+- **特徴**: max_iter: 15（効率的な分析）
+
+#### 3. Writer Agent（文書作成専門）
+- **強み**: 高品質なコンテンツ作成
+- **使用場面**: レポート作成、ドキュメント作成、提案書作成
+- **特徴**: 多様なライティングスタイル対応
+
+#### 4. Validator Agent（検証専門）
+- **強み**: 品質保証と精度検証
+- **使用場面**: 事実確認、一貫性チェック、品質検証
+- **特徴**: 厳密な検証プロセス
+
+#### 5. Manager Agent（管理専門）
+- **強み**: チーム調整とタスク管理
+- **使用場面**: 階層プロセスでの中央管理
+- **特徴**: reasoning機能有効、max_iter: 25
+
+#### 6. Evolution Agent（進化専門）
+- **強み**: システム改善と最適化
+- **使用場面**: パフォーマンス分析、改善提案生成
+- **特徴**: max_iter: 20、学習パターン識別
+
+### 特殊エージェント
+
+- **Docker Agent**: Docker環境の操作と管理
+- **MCP Specialist**: MCPツールの活用
+- **Simple Research Agent**: 軽量版の調査エージェント
+- **Test Evolution Agent**: 進化機能のテスト用
+
+## 設定と使用方法
+
+### 基本的な使用方法
+
+#### 1. タスクの実行（同期）
+```bash
+curl -X POST http://localhost:8000/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "crew_name": "main_crew",
+    "task": "市場調査レポートを作成してください",
+    "async_execution": false
+  }'
+```
+
+#### 2. タスクの実行（非同期）
+```bash
+curl -X POST http://localhost:8000/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "crew_name": "main_crew",
+    "task": "複雑な分析タスク",
+    "async_execution": true
+  }'
+```
+
+### 設定のカスタマイズ
+
+#### エージェント設定（config/agents/）
+```yaml
+research_agent:
+  role: "Research Specialist"
+  goal: "包括的な調査とレポート作成"
+  backstory: "経験豊富な研究者"
+  memory: true
+  verbose: false
+  max_iter: 30
+  tools:
+    - search_tool
+    - mcp_discover
+```
+
+#### タスク設定（config/tasks/）
+```yaml
+research_task:
+  description: "調査タスクの説明"
+  expected_output: "詳細な調査レポート"
+  agent: "research_agent"
+  guardrails:
+    - json_validation
+    - hallucination_check
+```
+
+#### クルー設定（config/crews/）
+```yaml
+main_crew:
+  process: hierarchical
+  manager_agent: manager_agent
+  memory: true
+  memory_config:
+    provider: "basic"
+  planning: true
+  planning_llm: "monica"
+```
+
+### 知識の追加方法
+
+#### 1. テキストファイルとして追加
+```bash
+# knowledge/ディレクトリに.txtまたは.mdファイルを配置
+echo "新しい知識内容" > knowledge/new_knowledge.txt
+```
+
+#### 2. プログラムから追加
+```python
+knowledge_manager = KnowledgeManager()
+knowledge_manager.add_knowledge_to_graph(
+    entity_name="OKAMI",
+    entity_type="System",
+    observations=["自己進化型AIシステム", "CrewAIベース"]
+)
+```
+
+## トラブルシューティング
+
+### よくある問題と解決方法
+
+#### 1. Monica API接続エラー
+```bash
+# APIキーとURLの確認
+cat .env | grep MONICA
+
+# Dockerログの確認
+docker-compose logs okami | grep -i error
+```
+
+#### 2. メモリ関連エラー
+- `config/crews/main_crew.yaml`の`memory_config.provider`が`"basic"`になっているか確認
+- `storage/`ディレクトリの書き込み権限を確認
+
+#### 3. MCPツールが使用できない
+```bash
+# Docker MCP Gatewayの確認
+docker ps | grep mcp
+
+# MCPツールの検出テスト
+curl -X POST http://localhost:8000/mcp/discover
+```
+
+#### 4. 知識が反映されない
+```bash
+# システム再起動
+docker-compose restart okami
+
+# 知識の再読み込み
+# APIエンドポイントから知識更新をトリガー
+```
+
+### デバッグ方法
+
+#### ログの確認
+```bash
+# リアルタイムログ
+docker-compose logs -f okami
+
+# エラーログのフィルタリング
+docker-compose logs okami | grep -E "ERROR|CRITICAL"
+```
+
+#### ヘルスチェック
+```bash
+# システム状態の確認
+curl http://localhost:8000/health
+
+# 利用可能なクルーの確認
+curl http://localhost:8000/crews
+```
+
+## 関連リソース
+
+### ナレッジファイル
+- [AI技術動向](./AI_advancements.md) - 最新のAI技術情報
+- [エラーパターン](./error_patterns.md) - 一般的なエラーと対処法
+- [ベストプラクティス](./best_practices.md) - 推奨される使用方法
+- [最適化手法](./optimization_best_practices.md) - パフォーマンス最適化
+- [文化用語](./cultural_terms.md) - 文化的コンテキスト
+- [システム進化履歴](./system/evolution_history.md) - 自動進化の記録
+
+### 技術ドキュメント
+- [README.md](/README.md) - プロジェクト概要
+
+### 外部リソース
+- [CrewAI公式ドキュメント](https://docs.crewai.com)
+- [Monica LLM API](https://monica.im)
+- [ChromaDB](https://www.trychroma.com)
+- [Qdrant](https://qdrant.tech)
+
+---
+
+*このファイルはOKAMIシステムの中核ナレッジベースです。システムの理解と効果的な活用のための包括的な情報を提供しています。*
+
+## Evolution Update - 2025-08-06T08:06:34.496065
+
+"file": "knowledge/optimization_best_practices.md",
+
+
+## Evolution Update - 2025-08-06T15:23:28.304213
+
+"file": "knowledge/japanese_culture_terminology.md",
+
+
+## Evolution Update - 2025-08-11T04:52:44.568341
+
+"file": "knowledge/japanese_cultural_terms.md",
+
+
+## Evolution Update - 2025-08-11T05:00:10.357311
+
+"file": "knowledge/system_improvement_guidelines.md",
+
+
+## Evolution Update - 2025-08-11T05:01:53.572093
+
+"file": "knowledge/optimization_best_practices.md",

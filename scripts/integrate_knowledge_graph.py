@@ -220,7 +220,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from knowledge.knowledge_graph_source import KnowledgeGraphSource
+from core.knowledge_sources.knowledge_graph_source import KnowledgeGraphSource
 
 
 def test_knowledge_graph_source():

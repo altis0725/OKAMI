@@ -22,6 +22,7 @@ evolution_crew:
   
   # Memory設定（basicメモリとmem0 external memoryを併用）
   memory: true  # basicメモリを有効化
+  graph_memory: true  # グラフメモリを有効化
   # external_memoryはcrew_factory.pyで動的に設定される（mem0）
   memory_config:
     provider: "basic"  # 通常のメモリはbasicを使用

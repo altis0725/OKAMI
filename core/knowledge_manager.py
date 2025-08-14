@@ -174,7 +174,10 @@ class KnowledgeManager:
         directory = directory or self.knowledge_dir
         knowledge_sources = {
             'crew': [],
-            'agents': {}
+            'agents': {},
+            'domain': [],
+            'general': [],
+            'system': []
         }
         
         # crewディレクトリの知識を読み込む
@@ -200,6 +203,33 @@ class KnowledgeManager:
                     
                     knowledge_sources['agents'][agent_name].append(source)
                     logger.info(f"Loaded agent knowledge: {agent_name} <- {file_path.name}")
+        
+        # domainディレクトリの知識を読み込む
+        domain_dir = Path(directory) / 'domain'
+        if domain_dir.exists():
+            for file_path in domain_dir.iterdir():
+                if file_path.is_file():
+                    source = self.create_knowledge_source(str(file_path))
+                    knowledge_sources['domain'].append(source)
+                    logger.info(f"Loaded domain knowledge: {file_path.name}")
+        
+        # generalディレクトリの知識を読み込む
+        general_dir = Path(directory) / 'general'
+        if general_dir.exists():
+            for file_path in general_dir.iterdir():
+                if file_path.is_file():
+                    source = self.create_knowledge_source(str(file_path))
+                    knowledge_sources['general'].append(source)
+                    logger.info(f"Loaded general knowledge: {file_path.name}")
+        
+        # systemディレクトリの知識を読み込む
+        system_dir = Path(directory) / 'system'
+        if system_dir.exists():
+            for file_path in system_dir.iterdir():
+                if file_path.is_file():
+                    source = self.create_knowledge_source(str(file_path))
+                    knowledge_sources['system'].append(source)
+                    logger.info(f"Loaded system knowledge: {file_path.name}")
         
         return knowledge_sources
 
@@ -519,8 +549,10 @@ class KnowledgeManager:
             # 自動読み込みを実行
             knowledge_sources = self.load_knowledge_from_directory()
             
-            # クルー知識を追加（すでに知識ソースオブジェクト）
+            # クルー知識を追加（crew + domain + general + system をクルー全体で共有）
             crew_added = 0
+            
+            # crewディレクトリ
             for source in knowledge_sources['crew']:
                 # 重複チェック
                 source_content = str(source)
@@ -528,6 +560,30 @@ class KnowledgeManager:
                     self.crew_sources.append(source)
                     crew_added += 1
                     logger.info("Crew knowledge source added", source_type=type(source).__name__)
+            
+            # domainディレクトリ（クルー全体で共有）
+            for source in knowledge_sources['domain']:
+                source_content = str(source)
+                if not any(str(existing) == source_content for existing in self.crew_sources):
+                    self.crew_sources.append(source)
+                    crew_added += 1
+                    logger.info("Domain knowledge added to crew", source_type=type(source).__name__)
+            
+            # generalディレクトリ（クルー全体で共有）
+            for source in knowledge_sources['general']:
+                source_content = str(source)
+                if not any(str(existing) == source_content for existing in self.crew_sources):
+                    self.crew_sources.append(source)
+                    crew_added += 1
+                    logger.info("General knowledge added to crew", source_type=type(source).__name__)
+            
+            # systemディレクトリ（クルー全体で共有）
+            for source in knowledge_sources['system']:
+                source_content = str(source)
+                if not any(str(existing) == source_content for existing in self.crew_sources):
+                    self.crew_sources.append(source)
+                    crew_added += 1
+                    logger.info("System knowledge added to crew", source_type=type(source).__name__)
             
             # エージェント知識を追加（すでに知識ソースオブジェクト）
             agent_added = 0
@@ -550,6 +606,9 @@ class KnowledgeManager:
                 "total_crew_sources": len(self.crew_sources),
                 "total_agent_sources": sum(len(sources) for sources in self.agent_sources.values()),
                 "agents_with_knowledge": list(self.agent_sources.keys()),
+                "domain_sources": len(knowledge_sources['domain']),
+                "general_sources": len(knowledge_sources['general']),
+                "system_sources": len(knowledge_sources['system']),
                 "refresh_timestamp": datetime.now().isoformat()
             }
             
@@ -573,9 +632,15 @@ class KnowledgeManager:
             # ディレクトリ構造を確認・作成
             agents_dir = Path(self.knowledge_dir) / 'agents'
             crew_dir = Path(self.knowledge_dir) / 'crew'
+            domain_dir = Path(self.knowledge_dir) / 'domain'
+            general_dir = Path(self.knowledge_dir) / 'general'
+            system_dir = Path(self.knowledge_dir) / 'system'
             
             agents_dir.mkdir(parents=True, exist_ok=True)
             crew_dir.mkdir(parents=True, exist_ok=True)
+            domain_dir.mkdir(parents=True, exist_ok=True)
+            general_dir.mkdir(parents=True, exist_ok=True)
+            system_dir.mkdir(parents=True, exist_ok=True)
             
             # デフォルト知識ファイルが存在しない場合は作成
             self._create_default_knowledge_files()

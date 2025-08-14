@@ -15,7 +15,10 @@ research_agent:
     '
   goal: Conduct thorough research on assigned topics and provide comprehensive, accurate,
     and insightful reports
+  
   knowledge_sources: []
+  # - agents/research_agent.md
+  
   max_iter: 30
   max_rpm: 10
   memory: false
@@ -78,4 +81,10 @@ research_agent:
     Current context: {context}
 
     '
+  # tools:
+  # - knowledge_search
+  # - SerperDevTool
+  # - WebsiteSearchTool
+  # - FileReadTool
+  # - DirectoryReadTool
   verbose: true

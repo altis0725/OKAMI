@@ -51,7 +51,7 @@ class TestMemoryIntegration:
         config = {
             'use_mem0': True,
             'chroma_db_path': './test_storage/chroma_db',
-            'embedding_provider': 'huggingface'
+            'embedding_provider': 'ollama'
         }
         manager = MemoryManager(config)
         await manager.initialize()
