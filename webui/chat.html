@@ -445,7 +445,18 @@
     </div>
     
     <script>
-        const API_BASE = 'http://localhost:8000';
+        // API_BASEを自動判定
+        const API_BASE = (() => {
+            // ローカル開発環境かどうかを判定
+            if (window.location.hostname === 'localhost' || 
+                window.location.hostname === '127.0.0.1' ||
+                window.location.hostname === '') {
+                return 'http://localhost:8000';
+            } else {
+                // 本番環境の場合は現在のドメインを使用
+                return `${window.location.protocol}//${window.location.host}`;
+            }
+        })();
         let currentChatId = generateChatId();
         let chats = loadChats();
         let isProcessing = false;
