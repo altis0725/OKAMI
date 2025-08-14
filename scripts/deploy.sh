@@ -22,7 +22,7 @@ NC='\033[0m' # No Color
 # 設定
 DOMAIN="traning.work"
 SERVER_IP="138.2.45.112"
-APP_DIR="~/OKAMI"
+APP_DIR="/home/ubuntu/OKAMI"
 BACKUP_DIR="./backups"
 LOG_FILE="./logs/deploy.log"
 
