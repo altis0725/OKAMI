@@ -22,9 +22,9 @@ NC='\033[0m' # No Color
 # 設定
 DOMAIN="traning.work"
 SERVER_IP="138.2.45.112"
-APP_DIR="/opt/okami"
-BACKUP_DIR="/opt/backups/okami"
-LOG_FILE="/var/log/okami-deploy.log"
+APP_DIR="~/OKAMI"
+BACKUP_DIR="./backups"
+LOG_FILE="./logs/deploy.log"
 
 # ログ関数
 log() {
