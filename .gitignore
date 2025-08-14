@@ -60,6 +60,9 @@ knowledge/**/*.yml
 knowledge/**/*.bak
 knowledge/**/*.log
 
+# Evolution backups
+evolution/backups/
+
 *.lock
 chromadb-*.lock
 
