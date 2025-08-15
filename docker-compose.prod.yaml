@@ -76,6 +76,7 @@ services:
       - okami-network
     depends_on:
       - chromadb
+      - ollama
     restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -161,24 +162,24 @@ services:
       - okami-network
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
-  # Optional: Ollama for local embeddings (本番環境では通常不要)
-  # ollama:
-  #   image: ollama/ollama:latest
-  #   container_name: okami-ollama
-  #   expose:
-  #     - "11434"
-  #   volumes:
-  #     - ollama-data:/root/.ollama
-  #   environment:
-  #     - OLLAMA_HOST=0.0.0.0
-  #   networks:
-  #     - okami-network
-  #   restart: always
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '2'
-  #         memory: 4G
+  # Ollama for local embeddings (開発環境用に有効化)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: okami-ollama
+    expose:
+      - "11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - okami-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
 
   # Optional: Monitoring with Prometheus Node Exporter
   node-exporter:
@@ -210,8 +211,8 @@ volumes:
     driver: local
   nginx-logs:
     driver: local
-  # ollama-data:
-  #   driver: local
+  ollama-data:
+    driver: local
 
 networks:
   okami-network:

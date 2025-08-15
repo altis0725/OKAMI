@@ -16,8 +16,8 @@ services:
       - CREWAI_DISABLE_TELEMETRY=true
       - OTEL_SDK_DISABLED=true
       - LOG_LEVEL=INFO
-      - OLLAMA_HOST=http://host.docker.internal:11434
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_BASE_URL=http://ollama:11434
       - EMBEDDER_PROVIDER=ollama
       - EMBEDDER_MODEL=mxbai-embed-large
       # QDRANT_HOST=qdrant
@@ -34,13 +34,14 @@ services:
       # CrewAI知識ベース用の設定
       - CREWAI__EMBEDDINGS__PROVIDER=ollama
       - CREWAI__EMBEDDINGS__MODEL=mxbai-embed-large
-      - CREWAI__EMBEDDINGS__BASE_URL=http://host.docker.internal:11434
+      - CREWAI__EMBEDDINGS__BASE_URL=http://ollama:11434
     env_file:
       - .env
     networks:
       - okami-network
     depends_on:
       - chromadb
+      - ollama
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -109,28 +110,45 @@ services:
   #     retries: 3
   #     start_period: 30s
 
-  # Ollama for local embeddings - ホストのOllamaを使用するためコメントアウト
-  # ollama:
-  #   image: ollama/ollama:latest
-  #   container_name: okami-ollama
-  #   ports:
-  #     - "11434:11434"
-  #   volumes:
-  #     - ollama-data:/root/.ollama
-  #   environment:
-  #     - OLLAMA_HOST=0.0.0.0
-  #   networks:
-  #     - okami-network
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 5
-  #     start_period: 120s
+  # Ollama for local embeddings - Docker環境に組み込み
+  ollama:
+    image: ollama/ollama:latest
+    container_name: okami-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - okami-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # Ollama初期化サービス
+  ollama-init:
+    image: curlimages/curl:latest
+    container_name: okami-ollama-init
+    command: ["sh", "-c", "sleep 30 && /scripts/init_ollama.sh"]
+    volumes:
+      - ./scripts/init_ollama.sh:/scripts/init_ollama.sh:ro
+    environment:
+      - DOWNLOAD_JAPANESE_MODEL=false
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - okami-network
+    restart: "no"
 
 volumes:
   chroma-data:
+  ollama-data:
   # qdrant-data:
 
 networks:
