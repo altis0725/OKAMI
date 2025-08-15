@@ -1,0 +1,56 @@
+# Next.js専用のビルドステージ（マルチプラットフォーム対応）
+FROM node:20-alpine AS nextjs-builder
+
+WORKDIR /app
+
+# パッケージファイルをコピー
+COPY webui/nextjs-chat/package*.json ./
+
+# 依存関係のインストール（プラットフォーム別の最適化）
+RUN npm ci --force || npm install --force
+
+# ソースコードをコピー
+COPY webui/nextjs-chat/ ./
+
+# ビルド実行
+RUN npm run build
+
+# メインのPythonイメージ
+FROM python:3.11-slim
+
+# 作業ディレクトリ設定
+WORKDIR /app
+
+# システムの依存関係インストール
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python依存関係のインストール
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# アプリケーションコードをコピー
+COPY . .
+
+# Next.jsビルド結果をコピー
+COPY --from=nextjs-builder /app/out /app/webui/static
+
+# 必要なディレクトリを作成
+RUN mkdir -p /app/storage /app/logs /app/knowledge
+
+# 環境変数設定
+ENV PYTHONUNBUFFERED=1
+ENV CREWAI_STORAGE_DIR=/app/storage
+
+# ポート公開
+EXPOSE 8000
+
+# ヘルスチェック
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+# アプリケーション実行
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

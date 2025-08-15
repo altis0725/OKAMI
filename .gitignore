@@ -102,3 +102,10 @@ CLAUDE.md
 
 # Serena
 .serena/
+
+# WebUI
+webui/static/
+webui/nextjs-chat/node_modules/
+webui/nextjs-chat/.next/
+webui/nextjs-chat/out/
+webui/nextjs-chat/package-lock.json

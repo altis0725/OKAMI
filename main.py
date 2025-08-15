@@ -78,10 +78,26 @@ app.add_middleware(
 # 静的ファイルのマウント
 static_path = Path(__file__).parent / "webui" / "public"
 if static_path.exists():
-    app.mount("/public", StaticFiles(directory=static_path), name="static")
+    app.mount("/public", StaticFiles(directory=static_path), name="public")
 
-# webui_distパスの初期化
-webui_dist = Path(__file__).parent / "webui" / "dist"
+# Next.js 静的ファイルのマウント
+webui_static = Path(__file__).parent / "webui" / "static"  # build-ui.shでコピーされる場所
+webui_nextjs_out = Path(__file__).parent / "webui" / "nextjs-chat" / "out"  # Next.jsビルド出力
+
+# 優先順位: 1. static/ (build-ui.sh実行後), 2. nextjs-chat/out (npm run build後)
+if webui_static.exists():
+    # _next ディレクトリのマウント
+    nextjs_static = webui_static / "_next"
+    if nextjs_static.exists():
+        app.mount("/_next", StaticFiles(directory=str(nextjs_static)), name="nextjs_static")
+    # ルート静的ファイルのマウント（HTML以外）
+    app.mount("/static", StaticFiles(directory=str(webui_static)), name="static_files")
+elif webui_nextjs_out.exists():
+    # Next.jsビルド出力から直接配信
+    nextjs_static = webui_nextjs_out / "_next"
+    if nextjs_static.exists():
+        app.mount("/_next", StaticFiles(directory=str(nextjs_static)), name="nextjs_out")
+    app.mount("/static", StaticFiles(directory=str(webui_nextjs_out)), name="out_files")
 
 
 # リクエスト/レスポンスモデル
@@ -870,12 +886,48 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# チャットHTML UIを提供
-chat_ui_path = Path(__file__).parent / "webui" / "chat.html"
-if chat_ui_path.exists():
-    @app.get("/", response_class=FileResponse)
-    async def serve_app():
-        return FileResponse(chat_ui_path)
+# Next.js UIまたはフォールバックUIを提供
+@app.get("/", response_class=FileResponse)
+async def serve_app():
+    """ルートパスでNext.js UIまたはフォールバックUIを提供"""
+    # Next.js ビルド済みindex.htmlを優先
+    if webui_static.exists():
+        nextjs_index = webui_static / "index.html"
+        if nextjs_index.exists():
+            return FileResponse(nextjs_index)
+    elif webui_nextjs_out.exists():
+        nextjs_index = webui_nextjs_out / "index.html"
+        if nextjs_index.exists():
+            return FileResponse(nextjs_index)
+    
+    # 最終フォールバック: APIルート情報を返す
+    return JSONResponse({
+        "message": "OKAMI WebUI is not available",
+        "api_endpoint": "/api",
+        "health_check": "/health",
+        "note": "Please build the Next.js UI first (run ./scripts/build-ui.sh)"
+    })
+
+# Next.js SPAのキャッチオール（存在しないパスを index.html にルーティング）
+@app.get("/{path:path}")
+async def catch_all(path: str):
+    """Next.js SPAのクライアントサイドルーティング対応"""
+    # APIパスは除外
+    if path.startswith("api/") or path.startswith("_next/") or path in ["health", "docs", "openapi.json", "tasks", "crews", "agents", "monitoring", "improvements"]:
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    # Next.js index.htmlを返す
+    if webui_static.exists():
+        nextjs_index = webui_static / "index.html"
+        if nextjs_index.exists():
+            return FileResponse(nextjs_index)
+    elif webui_nextjs_out.exists():
+        nextjs_index = webui_nextjs_out / "index.html"
+        if nextjs_index.exists():
+            return FileResponse(nextjs_index)
+    
+    # フォールバック
+    raise HTTPException(status_code=404, detail="UI not found")
 
 
 if __name__ == "__main__":

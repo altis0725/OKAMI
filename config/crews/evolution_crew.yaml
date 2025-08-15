@@ -45,7 +45,7 @@ evolution_crew:
     provider: "ollama"
     config:
       model: "mxbai-embed-large"
-      url: "http://localhost:11434/api/embeddings"
+      url: "http://host.docker.internal:11434/api/embeddings"
   
   evolution_config:
     min_data_points: 100

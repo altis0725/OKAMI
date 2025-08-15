@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #fff;
+    --foreground: #222;
+    --card: #fff;
+    --card-foreground: #222;
+    --primary: #343541;
+    --primary-foreground: #fff;
+    --border: #e5e7eb;
+    --input: #e5e7eb;
+    --radius: 0.5rem;
+  }
+  .dark {
+    --background: #343541;
+    --foreground: #fff;
+    --card: #202123;
+    --card-foreground: #fff;
+    --primary: #343541;
+    --primary-foreground: #fff;
+    --border: #3e3f4b;
+    --input: #3e3f4b;
+  }
+  body {
+    background: var(--background) !important;
+    color: var(--foreground) !important;
+    min-height: 100vh;
+    transition: background 150ms, color 150ms;
+  }
+  * {
+    border-color: var(--border) !important;
+    transition: border-color 150ms;
+  }
+}

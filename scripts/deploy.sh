@@ -216,19 +216,28 @@ start_services() {
     sleep 10
     
     # ヘルスチェック
-    MAX_RETRIES=30
-    RETRY_COUNT=0
+MAX_RETRIES=30
+RETRY_COUNT=0
+
+# デプロイモードに応じてヘルスチェックの対象を決定
+if [ "${DEPLOY_MODE}" = "local" ]; then
+    HEALTH_CHECK_URL="http://localhost:8000/health"
+else
+    # リモートデプロイの場合は、サーバー自身のlocalhostを使用
+    HEALTH_CHECK_URL="https://traning.work/health"
+    info "Using localhost for health check (remote server)"
+fi
+
+while [ ${RETRY_COUNT} -lt ${MAX_RETRIES} ]; do
+    if curl -f ${HEALTH_CHECK_URL} > /dev/null 2>&1; then
+        log "✓ Health check passed"
+        break
+    fi
     
-    while [ ${RETRY_COUNT} -lt ${MAX_RETRIES} ]; do
-        if curl -f http://localhost:8000/health > /dev/null 2>&1; then
-            log "✓ Health check passed"
-            break
-        fi
-        
-        RETRY_COUNT=$((RETRY_COUNT + 1))
-        info "Health check attempt ${RETRY_COUNT}/${MAX_RETRIES}..."
-        sleep 5
-    done
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    info "Health check attempt ${RETRY_COUNT}/${MAX_RETRIES}..."
+    sleep 5
+done
     
     if [ ${RETRY_COUNT} -eq ${MAX_RETRIES} ]; then
         error "Health check failed after ${MAX_RETRIES} attempts"
