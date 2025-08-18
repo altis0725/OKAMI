@@ -16,17 +16,15 @@ services:
       - CREWAI_DISABLE_TELEMETRY=true
       - OTEL_SDK_DISABLED=true
       - LOG_LEVEL=INFO
-      - OLLAMA_HOST=http://host.docker.internal:11434
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_BASE_URL=http://ollama:11434
       - EMBEDDER_PROVIDER=ollama
       - EMBEDDER_MODEL=mxbai-embed-large
-      # QDRANT_HOST=qdrant
-      # QDRANT_PORT=6333
-      # QDRANT_GRPC_PORT=6334
       - VECTOR_STORE_TYPE=chroma
       - CHROMA_HOST=chromadb
       - CHROMA_PORT=8000
-      - CHROMA_PERSIST_DIRECTORY=/app/storage/chroma
+      # ChromaDBをHTTPクライアントモードで使用（永続化はChromaDB側で管理）
+      - CHROMA_PERSIST_DIRECTORY=
       - USE_QDRANT=false
       # CrewAI内部メモリ用のChroma設定
       - CHROMA_SERVER_HOST=chromadb
@@ -34,20 +32,21 @@ services:
       # CrewAI知識ベース用の設定
       - CREWAI__EMBEDDINGS__PROVIDER=ollama
       - CREWAI__EMBEDDINGS__MODEL=mxbai-embed-large
-      - CREWAI__EMBEDDINGS__BASE_URL=http://host.docker.internal:11434
+      - CREWAI__EMBEDDINGS__BASE_URL=http://ollama:11434
     env_file:
       - .env
     networks:
       - okami-network
     depends_on:
       - chromadb
+      - ollama
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
 
   # Claude Code Quality Monitor service
   claude-monitor:
@@ -86,52 +85,40 @@ services:
       - okami-network
     restart: unless-stopped
 
-  # Qdrant for vector storage（無効化）
-  # qdrant:
-  #   image: qdrant/qdrant:latest
-  #   container_name: okami-qdrant
-  #   ports:
-  #     - "6333:6333"
-  #     - "6334:6334"  # gRPC port
-  #   volumes:
-  #     - qdrant-data:/qdrant/storage
-  #   environment:
-  #     - QDRANT__SERVICE__GRPC_PORT=6334
-  #     - QDRANT__SERVICE__HTTP_PORT=6333
-  #     - QDRANT__LOG_LEVEL=INFO
-  #   networks:
-  #     - okami-network
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 30s
-
-  # Ollama for local embeddings - ホストのOllamaを使用するためコメントアウト
-  # ollama:
-  #   image: ollama/ollama:latest
-  #   container_name: okami-ollama
-  #   ports:
-  #     - "11434:11434"
-  #   volumes:
-  #     - ollama-data:/root/.ollama
-  #   environment:
-  #     - OLLAMA_HOST=0.0.0.0
-  #   networks:
-  #     - okami-network
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 5
-  #     start_period: 120s
+  # Ollama for local embeddings
+  ollama:
+    image: ollama/ollama:latest
+    container_name: okami-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+      - ./scripts/ollama-entrypoint.sh:/entrypoint.sh:ro
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_NUM_PARALLEL=1  # バッチ処理を無効化（エラー回避）
+      - OLLAMA_MAX_LOADED_MODELS=1  # エンベディングモデル1つに制限
+      - OLLAMA_KEEP_ALIVE=5m  # モデルをメモリに保持
+    networks:
+      - okami-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
+    deploy:
+      resources:
+        limits:
+          memory: 8G  # メモリ上限を設定
+        reservations:
+          memory: 4G  # 最小メモリを確保
 
 volumes:
   chroma-data:
-  # qdrant-data:
+  ollama-data:
 
 networks:
   okami-network:

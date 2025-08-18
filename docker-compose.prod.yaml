@@ -45,18 +45,19 @@ services:
       - CHROMA_SERVER_HOST=chromadb
       - CHROMA_SERVER_HTTP_PORT=8000
       
-      # Embeddings設定（本番環境ではOpenAIを使用）
-      - EMBEDDER_PROVIDER=${EMBEDDER_PROVIDER:-openai}
-      - EMBEDDER_MODEL=${EMBEDDER_MODEL:-text-embedding-3-small}
+      # Embeddings設定（本番環境でもOllamaを使用可能）
+      - EMBEDDER_PROVIDER=${EMBEDDER_PROVIDER:-ollama}
+      - EMBEDDER_MODEL=${EMBEDDER_MODEL:-mxbai-embed-large}
       
       # CrewAI知識ベース用の設定
-      - CREWAI__EMBEDDINGS__PROVIDER=${EMBEDDER_PROVIDER:-openai}
-      - CREWAI__EMBEDDINGS__MODEL=${EMBEDDER_MODEL:-text-embedding-3-small}
+      - CREWAI__EMBEDDINGS__PROVIDER=${EMBEDDER_PROVIDER:-ollama}
+      - CREWAI__EMBEDDINGS__MODEL=${EMBEDDER_MODEL:-mxbai-embed-large}
+      - CREWAI__EMBEDDINGS__BASE_URL=http://ollama:11434
       
-      # Ollama設定（オプション）
-      - OLLAMA_HOST=${OLLAMA_HOST:-}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-}
+      # Ollama設定（Docker内部で動作）
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-mxbai-embed-large}
       
       # MCP Gateway設定（オプション）
       - MCP_GATEWAY_URL=${MCP_GATEWAY_URL:-}
@@ -76,6 +77,7 @@ services:
       - okami-network
     depends_on:
       - chromadb
+      - ollama
     restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -161,24 +163,38 @@ services:
       - okami-network
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
-  # Optional: Ollama for local embeddings (本番環境では通常不要)
-  # ollama:
-  #   image: ollama/ollama:latest
-  #   container_name: okami-ollama
-  #   expose:
-  #     - "11434"
-  #   volumes:
-  #     - ollama-data:/root/.ollama
-  #   environment:
-  #     - OLLAMA_HOST=0.0.0.0
-  #   networks:
-  #     - okami-network
-  #   restart: always
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '2'
-  #         memory: 4G
+  # Ollama for local embeddings
+  ollama:
+    image: ollama/ollama:latest
+    container_name: okami-ollama
+    expose:
+      - "11434"
+    volumes:
+      - ollama-data:/root/.ollama
+      - ./scripts/ollama-entrypoint.sh:/entrypoint.sh:ro
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_NUM_PARALLEL=1  # バッチ処理を無効化（エラー回避）
+      - OLLAMA_MAX_LOADED_MODELS=1  # エンベディングモデル1つに制限
+      - OLLAMA_KEEP_ALIVE=5m  # モデルをメモリに保持
+    networks:
+      - okami-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 8G  # メモリを増加
+        reservations:
+          cpus: '1'
+          memory: 4G  # 最小メモリも増加
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
 
   # Optional: Monitoring with Prometheus Node Exporter
   node-exporter:
@@ -210,8 +226,8 @@ volumes:
     driver: local
   nginx-logs:
     driver: local
-  # ollama-data:
-  #   driver: local
+  ollama-data:
+    driver: local
 
 networks:
   okami-network:

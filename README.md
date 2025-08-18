@@ -92,10 +92,10 @@ OKAMI/
 ## 技術スタック
 
 - **Python**: 3.11+
-- **CrewAI**: 0.140.0 (tools付き)
+- **CrewAI**: 0.159.0 (tools付き)
 - **FastAPI**: REST API
 - **Monica LLM**: GPT-4o互換API
-- **Qdrant**: 高性能ベクトルストレージ
+- **ChromaDB**: ベクトルストレージ
 - **Ollama**: ローカル埋め込みモデル（mxbai-embed-large）
 - **Mem0**: 永続的メモリ管理（クラウド・ローカル対応）
 - **Docker**: コンテナ化
@@ -108,7 +108,6 @@ OKAMI/
 
 ### 前提条件
 - Docker & Docker Compose
-- Ollama（ローカルで実行中）
 - Monica LLM API キー
 
 ### 手順
@@ -118,20 +117,18 @@ OKAMI/
 cp .env.example .env
 # MONICA_API_KEY と MONICA_BASE_URL を設定
 
-# 2. Ollama埋め込みモデルの準備
-ollama pull mxbai-embed-large
-
-# 3. Dockerコンテナの起動
+# 2. Dockerコンテナの起動（Ollamaも自動起動）
 docker-compose up -d
+# ※初回起動時はOllamaがmxbai-embed-largeモデルを自動ダウンロード
 
-# 4. ヘルスチェック
+# 3. ヘルスチェック
 curl http://localhost:8000/health
 
-# 5. 利用可能なクルーの確認
+# 4. 利用可能なクルーの確認
 curl http://localhost:8000/crews
 
-# 6. Qdrant接続確認
-curl http://localhost:6333/collections
+# 5. ChromaDB接続確認
+curl http://localhost:8001/api/v1/heartbeat
 ```
 
 ## 使用方法
@@ -216,28 +213,26 @@ mkdir -p nginx/ssl
 
 ## 🚨 既知の問題と解決策
 
-### 1. Qdrant接続エラー
-**症状**: `[Errno 111] Connection refused in upsert.`
+### 1. Ollama関連エラー
+**症状**: 起動時に「pulling manifest」が繰り返し表示される
 
-**原因**: 
-- コンテナ間でのOllama接続設定の不一致
-- Qdrant知識管理の初期化エラー
+**原因**: Docker起動時に毎回モデルをダウンロードしようとしている
+
+**解決策**: 
+- 最新版では修正済み（モデルが既に存在する場合はスキップ）
+- 手動確認：`docker exec okami-ollama ollama list`
+
+### 2. ChromaDB接続エラー
+**症状**: ベクトル検索でエラー
 
 **解決策**:
 ```bash
-# 1. Ollamaの起動確認
-ollama list
+# ChromaDBの状態確認
+docker-compose logs chromadb
+curl http://localhost:8001/api/v1/heartbeat
+
+# Ollamaの起動確認
 curl http://localhost:11434/api/tags
-
-# 2. Qdrantの状態確認
-docker-compose logs qdrant
-curl http://localhost:6333/health
-
-# 3. 知識管理を無効化してテスト
-# config/crews/simple_crew.yamlを使用
-curl -X POST http://localhost:8000/tasks \
-  -H "Content-Type: application/json" \
-  -d '{"crew_name": "simple_crew", "task": "Hello World test", "async_execution": false}'
 ```
 
 ### 2. Evolution履歴が見つからない

@@ -418,11 +418,15 @@ class CrewFactory:
                         pass
             
             # エンベッダー設定の取得（ollamaを使用）
+            # 環境変数からOllamaのURLを取得
+            ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+            embedder_model = os.getenv("EMBEDDER_MODEL", "mxbai-embed-large")
+            
             embedder_config = {
                 "provider": "ollama",  # ollamaを使用
                 "config": {
-                    "model": "mxbai-embed-large",
-                    "url": "http://host.docker.internal:11434/api/embeddings"
+                    "model": embedder_model,
+                    "url": f"{ollama_base_url}/api/embeddings"
                 }
             }
             

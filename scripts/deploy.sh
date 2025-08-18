@@ -184,6 +184,26 @@ setup_ssl() {
     fi
 }
 
+# Next.js UIのビルド
+build_ui() {
+    log "Building Next.js UI..."
+    
+    cd ${APP_DIR}
+    
+    # build-ui.shスクリプトの実行
+    if [ -f "./scripts/build-ui.sh" ]; then
+        chmod +x ./scripts/build-ui.sh
+        ./scripts/build-ui.sh
+        if [ $? -eq 0 ]; then
+            log "✓ Next.js UI built successfully"
+        else
+            error "Next.js UI build failed"
+        fi
+    else
+        warning "build-ui.sh script not found, skipping UI build"
+    fi
+}
+
 # Dockerイメージのビルド
 build_images() {
     log "Building Docker images..."
@@ -214,6 +234,24 @@ start_services() {
     # ヘルスチェック待機
     log "Waiting for services to be healthy..."
     sleep 10
+    
+    # Ollamaの起動を確認（エンベディングモデルが正常に起動するまで待機）
+    log "Waiting for Ollama to be ready..."
+    MAX_OLLAMA_WAIT=60
+    OLLAMA_WAITED=0
+    while ! docker exec okami-ollama curl -s http://localhost:11434/api/tags > /dev/null 2>&1; do
+        if [ ${OLLAMA_WAITED} -ge ${MAX_OLLAMA_WAIT} ]; then
+            warning "Ollama is taking longer to start, continuing anyway..."
+            break
+        fi
+        sleep 3
+        OLLAMA_WAITED=$((OLLAMA_WAITED + 3))
+        info "Waiting for Ollama... ${OLLAMA_WAITED}s"
+    done
+    
+    if docker exec okami-ollama curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
+        log "✓ Ollama is ready"
+    fi
     
     # ヘルスチェック
 MAX_RETRIES=30
@@ -290,6 +328,20 @@ local_deploy() {
         log "✓ Self-signed certificates generated"
     fi
     
+    # Next.js UIのビルド
+    log "Building Next.js UI..."
+    if [ -f ./scripts/build-ui.sh ]; then
+        chmod +x ./scripts/build-ui.sh
+        ./scripts/build-ui.sh
+        if [ $? -eq 0 ]; then
+            log "✓ Next.js UI built successfully"
+        else
+            error "Next.js UI build failed"
+        fi
+    else
+        warning "build-ui.sh script not found, skipping UI build"
+    fi
+    
     # Dockerイメージのビルド
     log "Building Docker images..."
     docker-compose -f docker-compose.prod.yaml build
@@ -340,6 +392,7 @@ main() {
             update_repository
             setup_environment
             setup_ssl
+            build_ui
             build_images
             start_services
             setup_cert_renewal
@@ -351,6 +404,7 @@ main() {
             perform_backup
             update_repository
             setup_environment
+            build_ui
             build_images
             start_services
             show_status
@@ -368,6 +422,7 @@ main() {
             perform_backup
             update_repository
             setup_environment
+            build_ui
             build_images
             start_services
             show_status

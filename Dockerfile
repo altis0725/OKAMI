@@ -20,6 +20,9 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p /app/storage /app/logs /app/knowledge
 
+# Make wait script executable
+RUN chmod +x /app/scripts/wait-for-services.sh
+
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV CREWAI_STORAGE_DIR=/app/storage
