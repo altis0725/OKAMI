@@ -47,17 +47,17 @@ services:
       
       # Embeddings設定（本番環境でもOllamaを使用可能）
       - EMBEDDER_PROVIDER=${EMBEDDER_PROVIDER:-ollama}
-      - EMBEDDER_MODEL=${EMBEDDER_MODEL:-mxbai-embed-large}
+      - EMBEDDER_MODEL=${EMBEDDER_MODEL:-all-minilm:v2}  # Ubuntu用に軽量モデルをデフォルト
       
       # CrewAI知識ベース用の設定
       - CREWAI__EMBEDDINGS__PROVIDER=${EMBEDDER_PROVIDER:-ollama}
-      - CREWAI__EMBEDDINGS__MODEL=${EMBEDDER_MODEL:-mxbai-embed-large}
+      - CREWAI__EMBEDDINGS__MODEL=${EMBEDDER_MODEL:-all-minilm:v2}  # Ubuntu用に軽量モデルをデフォルト
       - CREWAI__EMBEDDINGS__BASE_URL=http://ollama:11434
       
       # Ollama設定（Docker内部で動作）
       - OLLAMA_HOST=http://ollama:11434
       - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-mxbai-embed-large}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-all-minilm:v2}  # Ubuntu用に軽量モデルをデフォルト
       
       # MCP Gateway設定（オプション）
       - MCP_GATEWAY_URL=${MCP_GATEWAY_URL:-}
@@ -73,6 +73,7 @@ services:
       - TASK_TIMEOUT=${TASK_TIMEOUT:-600}
     env_file:
       - .env.production
+      - .env.production.ubuntu  # Ubuntu環境の場合は追加
     networks:
       - okami-network
     depends_on:

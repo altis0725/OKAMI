@@ -166,6 +166,30 @@ setup_environment() {
         fi
     fi
     
+    # Ubuntu環境の場合、Ubuntu用環境変数ファイルもチェック
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        if [ "$ID" = "ubuntu" ]; then
+            if [ ! -f "${APP_DIR}/.env.production.ubuntu" ]; then
+                log "Creating Ubuntu-specific environment file..."
+                cat > ${APP_DIR}/.env.production.ubuntu << 'EOF'
+# Ubuntu本番環境専用の環境変数設定
+EMBEDDER_MODEL=all-minilm:v2
+OLLAMA_MODEL=all-minilm:v2
+REQUEST_TIMEOUT=600
+EMBEDDING_TIMEOUT=600
+TASK_TIMEOUT=1200
+OLLAMA_RETRY_COUNT=15
+OLLAMA_RETRY_DELAY=30
+MAX_WORKERS=2
+OLLAMA_NUM_THREADS=4
+OLLAMA_DEBUG=0
+EOF
+                log "✓ Ubuntu environment file created"
+            fi
+        fi
+    fi
+    
     log "✓ Environment configured"
 }
 
@@ -237,20 +261,44 @@ start_services() {
     
     # Ollamaの起動を確認（エンベディングモデルが正常に起動するまで待機）
     log "Waiting for Ollama to be ready..."
-    MAX_OLLAMA_WAIT=60
+    
+    # Ubuntu環境の検出
+    IS_UBUNTU=false
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        if [ "$ID" = "ubuntu" ]; then
+            IS_UBUNTU=true
+            log "Ubuntu environment detected - using lightweight model"
+            
+            # Ubuntu環境用の拡張待機時間
+            MAX_OLLAMA_WAIT=300  # 5分に延長
+        else
+            MAX_OLLAMA_WAIT=60
+        fi
+    else
+        MAX_OLLAMA_WAIT=60
+    fi
+    
     OLLAMA_WAITED=0
     while ! docker exec okami-ollama curl -s http://localhost:11434/api/tags > /dev/null 2>&1; do
         if [ ${OLLAMA_WAITED} -ge ${MAX_OLLAMA_WAIT} ]; then
             warning "Ollama is taking longer to start, continuing anyway..."
             break
         fi
-        sleep 3
-        OLLAMA_WAITED=$((OLLAMA_WAITED + 3))
+        sleep 5
+        OLLAMA_WAITED=$((OLLAMA_WAITED + 5))
         info "Waiting for Ollama... ${OLLAMA_WAITED}s"
     done
     
     if docker exec okami-ollama curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
         log "✓ Ollama is ready"
+        
+        # Ubuntu環境の場合、軽量モデルをプリロード
+        if [ "$IS_UBUNTU" = true ]; then
+            log "Preloading lightweight model for Ubuntu..."
+            docker exec okami-ollama ollama pull all-minilm:v2 || warning "Model pull failed, but continuing..."
+            docker exec okami-ollama ollama run all-minilm:v2 "test" || warning "Model initialization failed, but continuing..."
+        fi
     fi
     
     # ヘルスチェック

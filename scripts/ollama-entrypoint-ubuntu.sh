@@ -49,7 +49,8 @@ if [[ $RETRY_COUNT -ge $MAX_RETRIES ]]; then
 fi
 
 # モデルが既に存在するか確認してからプル
-MODEL="mxbai-embed-large"
+# Ubuntu環境では軽量モデルを使用
+MODEL="${OLLAMA_MODEL:-all-minilm:v2}"
 echo "Checking for model '${MODEL}'..."
 
 # モデル取得のリトライロジック
