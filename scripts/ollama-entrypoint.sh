@@ -4,9 +4,9 @@
 ollama serve &
 server_pid=$!
 
-# サーバーの準備完了を待機
+# サーバーの準備完了を待機（より長い待機時間）
 echo "Waiting for Ollama server to be ready..."
-MAX_WAIT=60
+MAX_WAIT=300  # 5分に延長
 WAITED=0
 while ! curl -s http://localhost:11434/api/tags > /dev/null 2>&1; do
     if [[ $WAITED -ge $MAX_WAIT ]]; then
@@ -14,8 +14,8 @@ while ! curl -s http://localhost:11434/api/tags > /dev/null 2>&1; do
         # exit 1を削除し、警告のみ表示
         break
     fi
-    sleep 3
-    WAITED=$((WAITED + 3))
+    sleep 5  # 待機間隔も長く
+    WAITED=$((WAITED + 5))
     echo "Waiting... ${WAITED}s"
 done
 

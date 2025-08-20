@@ -163,7 +163,7 @@ services:
       - okami-network
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
-  # Ollama for local embeddings
+  # Ollama for local embeddings - Ubuntu最適化版
   ollama:
     image: ollama/ollama:latest
     container_name: okami-ollama
@@ -171,12 +171,16 @@ services:
       - "11434"
     volumes:
       - ollama-data:/root/.ollama
-      - ./scripts/ollama-entrypoint.sh:/entrypoint.sh:ro
+      - ./scripts/ollama-entrypoint-ubuntu.sh:/entrypoint.sh:ro
     environment:
       - OLLAMA_HOST=0.0.0.0
       - OLLAMA_NUM_PARALLEL=1  # バッチ処理を無効化（エラー回避）
       - OLLAMA_MAX_LOADED_MODELS=1  # エンベディングモデル1つに制限
-      - OLLAMA_KEEP_ALIVE=5m  # モデルをメモリに保持
+      - OLLAMA_KEEP_ALIVE=10m  # モデルをメモリに長く保持
+      - OLLAMA_MODELS=/root/.ollama/models  # モデルパスを明示
+      - OLLAMA_DEBUG=${OLLAMA_DEBUG:-0}  # デバッグログ（環境変数で制御）
+      # CPU最適化設定
+      - OLLAMA_NUM_THREADS=4  # CPUスレッド数を制限
     networks:
       - okami-network
     restart: always
@@ -190,10 +194,10 @@ services:
           memory: 4G  # 最小メモリも増加
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 120s
+      interval: 60s  # インターバルを長く
+      timeout: 30s  # タイムアウトを長く
+      retries: 10  # リトライ回数を増やす
+      start_period: 900s  # 起動期間を15分に延長
     entrypoint: ["/bin/bash", "/entrypoint.sh"]
 
   # Optional: Monitoring with Prometheus Node Exporter
