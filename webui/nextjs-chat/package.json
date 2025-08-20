@@ -6,10 +6,13 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "build:static": "next build && next export",
+    "build:ubuntu": "npm install --legacy-peer-deps && next build",
     "start": "next start",
     "lint": "next lint",
     "deploy": "npm run build && npm run copy-to-okami",
-    "copy-to-okami": "rm -rf ../../webui/dist && cp -r out ../../webui/dist"
+    "copy-to-okami": "rm -rf ../../webui/dist && cp -r out ../../webui/dist",
+    "typecheck": "tsc --noEmit --skipLibCheck",
+    "clean": "rm -rf .next out node_modules package-lock.json"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.10",
@@ -22,10 +25,10 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.525.0",
-    "next": "15.3.5",
+    "next": "14.2.15",
     "next-themes": "^0.4.6",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.3.1",
@@ -34,11 +37,11 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.20",
     "eslint": "^9",
-    "eslint-config-next": "15.3.5",
+    "eslint-config-next": "14.2.15",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5"

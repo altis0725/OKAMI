@@ -17,15 +17,39 @@ cd "$NEXTJS_DIR"
 
 # node_modulesをクリーンアップ
 echo "🧹 古い依存関係をクリーンアップ中..."
-rm -rf node_modules package-lock.json
+rm -rf node_modules package-lock.json .next
 
-# 依存関係のインストール
+# Node.js/npm環境確認
+echo "🔍 Node.js環境確認中..."
+node --version
+npm --version
+
+# npmキャッシュクリア（Ubuntu環境での問題対策）
+echo "🧽 npmキャッシュをクリア中..."
+npm cache clean --force
+
+# 依存関係のインストール（Ubuntu環境向け最適化）
 echo "📦 依存関係をインストール中..."
-npm install
+# レガシーピア依存解決オプションを追加
+npm install --legacy-peer-deps --verbose || npm install --force --verbose
 
-# ビルド実行
+# TypeScript設定確認
+echo "🔧 TypeScript設定確認中..."
+if [ -f "tsconfig.json" ]; then
+    echo "✅ tsconfig.json が見つかりました"
+    # パス解決テスト
+    npx tsc --noEmit --skipLibCheck
+    if [ $? -ne 0 ]; then
+        echo "⚠️  TypeScript型チェックで警告がありますが、ビルドを継続します"
+    fi
+else
+    echo "❌ tsconfig.json が見つかりません"
+    exit 1
+fi
+
+# ビルド実行（詳細ログ付き）
 echo "🔨 Next.jsアプリをビルド中..."
-npm run build
+NODE_OPTIONS="--max-old-space-size=4096" npm run build --verbose
 
 # 静的ファイルをコピー
 echo "📁 静的ファイルをコピー中..."
