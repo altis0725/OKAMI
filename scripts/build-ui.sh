@@ -15,6 +15,11 @@ STATIC_DIR="$PROJECT_ROOT/webui/static"
 # Next.jsディレクトリに移動
 cd "$NEXTJS_DIR"
 
+# 現在のディレクトリとファイル構造を確認
+echo "📂 現在のディレクトリ: $(pwd)"
+echo "📁 src/lib/ディレクトリの内容:"
+ls -la src/lib/ 2>/dev/null || echo "  ❌ src/lib/が見つかりません"
+
 # node_modulesをクリーンアップ
 echo "🧹 古い依存関係をクリーンアップ中..."
 rm -rf node_modules package-lock.json .next
@@ -44,15 +49,47 @@ if ! npm list tailwind-merge >/dev/null 2>&1; then
     npm install tailwind-merge --legacy-peer-deps
 fi
 
+# utils.tsファイルが存在することを確認
+echo "🔍 utils.tsファイルを確認中..."
+if [ -f "src/lib/utils.ts" ]; then
+    echo "✅ src/lib/utils.ts が存在します"
+    echo "  内容:"
+    head -n 3 src/lib/utils.ts
+else
+    echo "❌ src/lib/utils.ts が見つかりません！作成します..."
+    mkdir -p src/lib
+    cat > src/lib/utils.ts << 'EOF'
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+EOF
+    echo "✅ src/lib/utils.ts を作成しました"
+fi
+
 # TypeScript設定確認（スキップ可能）
 echo "🔧 TypeScript設定確認中..."
 if [ -f "tsconfig.json" ]; then
     echo "✅ tsconfig.json が見つかりました"
+    # パス設定を確認
+    echo "  📝 パス設定:"
+    grep -A 3 '"paths"' tsconfig.json || echo "  パス設定が見つかりません"
     echo "ℹ️  TypeScriptチェックをスキップしてビルドを実行します"
 else
     echo "❌ tsconfig.json が見つかりません"
     exit 1
 fi
+
+# ビルド前の最終確認
+echo "📋 ビルド前の最終確認:"
+echo "  - 作業ディレクトリ: $(pwd)"
+echo "  - Node.jsバージョン: $(node --version)"
+echo "  - npmバージョン: $(npm --version)"
+echo "  - src/lib/utils.ts: $([ -f src/lib/utils.ts ] && echo '存在' || echo '不存在')"
+echo "  - node_modules: $([ -d node_modules ] && echo '存在' || echo '不存在')"
+echo "  - .next: $([ -d .next ] && echo '存在' || echo '不存在')"
 
 # ビルド実行（型チェックスキップ）
 echo "🔨 Next.jsアプリをビルド中..."
