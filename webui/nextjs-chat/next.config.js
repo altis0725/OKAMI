@@ -1,6 +1,5 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   // 静的エクスポートを有効化
   output: 'export',
   
@@ -24,4 +23,4 @@ const nextConfig: NextConfig = {
   })
 };
 
-export default nextConfig;
+module.exports = nextConfig;
