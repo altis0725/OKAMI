@@ -33,6 +33,17 @@ echo "📦 依存関係をインストール中..."
 # レガシーピア依存解決オプションを追加
 npm install --legacy-peer-deps --verbose || npm install --force --verbose
 
+# clsxとtailwind-mergeが確実にインストールされていることを確認
+echo "📦 必要な依存関係を確認中..."
+if ! npm list clsx >/dev/null 2>&1; then
+    echo "⚙️ clsxをインストール中..."
+    npm install clsx --legacy-peer-deps
+fi
+if ! npm list tailwind-merge >/dev/null 2>&1; then
+    echo "⚙️ tailwind-mergeをインストール中..."
+    npm install tailwind-merge --legacy-peer-deps
+fi
+
 # TypeScript設定確認（スキップ可能）
 echo "🔧 TypeScript設定確認中..."
 if [ -f "tsconfig.json" ]; then
