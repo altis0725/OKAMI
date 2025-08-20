@@ -377,7 +377,7 @@ start_services() {
             if [ ${TOTAL_MEM_GB} -le 1 ]; then
                 log "Ultra-low memory Ubuntu detected (1GB) - using minimal model"
                 UBUNTU_MODEL="nomic-embed-text:v1.5"
-                MAX_OLLAMA_WAIT=1800  # 30分（スワップ使用を考慮）
+                MAX_OLLAMA_WAIT=600  # 10分
             elif [ ${TOTAL_MEM_GB} -le 2 ]; then
                 log "Low memory Ubuntu detected (2GB) - using lightweight model"
                 UBUNTU_MODEL="all-minilm:v2"
@@ -400,12 +400,15 @@ start_services() {
             break
         fi
         
+        sleep 5
+        OLLAMA_WAITED=$((OLLAMA_WAITED + 5))
+        
         # 1GB環境では進捗を詳細に表示
-        if [ ${TOTAL_MEM_GB} -le 1 ] && [ $((OLLAMA_WAITED % 60)) -eq 0 ]; then
-            info "Still waiting for Ollama (using swap)... ${OLLAMA_WAITED}s / ${MAX_OLLAMA_WAIT}s"
+        if [ ${TOTAL_MEM_GB} -le 1 ]; then
+            if [ $((OLLAMA_WAITED % 60)) -eq 0 ]; then
+                info "Still waiting for Ollama (using swap)... ${OLLAMA_WAITED}s / ${MAX_OLLAMA_WAIT}s"
+            fi
         else
-            sleep 5
-            OLLAMA_WAITED=$((OLLAMA_WAITED + 5))
             info "Waiting for Ollama... ${OLLAMA_WAITED}s"
         fi
     done
