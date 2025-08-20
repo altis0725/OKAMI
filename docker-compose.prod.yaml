@@ -45,19 +45,19 @@ services:
       - CHROMA_SERVER_HOST=chromadb
       - CHROMA_SERVER_HTTP_PORT=8000
       
-      # Embeddings設定（本番環境でもOllamaを使用可能）
+      # Embeddings設定（超低メモリ環境用）
       - EMBEDDER_PROVIDER=${EMBEDDER_PROVIDER:-ollama}
-      - EMBEDDER_MODEL=${EMBEDDER_MODEL:-all-minilm:v2}  # Ubuntu用に軽量モデルをデフォルト
+      - EMBEDDER_MODEL=${EMBEDDER_MODEL:-nomic-embed-text:v1.5}  # 最軽量モデル（137MB）
       
       # CrewAI知識ベース用の設定
       - CREWAI__EMBEDDINGS__PROVIDER=${EMBEDDER_PROVIDER:-ollama}
-      - CREWAI__EMBEDDINGS__MODEL=${EMBEDDER_MODEL:-all-minilm:v2}  # Ubuntu用に軽量モデルをデフォルト
+      - CREWAI__EMBEDDINGS__MODEL=${EMBEDDER_MODEL:-nomic-embed-text:v1.5}  # 最軽量モデル
       - CREWAI__EMBEDDINGS__BASE_URL=http://ollama:11434
       
       # Ollama設定（Docker内部で動作）
       - OLLAMA_HOST=http://ollama:11434
       - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-all-minilm:v2}  # Ubuntu用に軽量モデルをデフォルト
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-nomic-embed-text:v1.5}  # 最軽量モデル
       
       # MCP Gateway設定（オプション）
       - MCP_GATEWAY_URL=${MCP_GATEWAY_URL:-}
@@ -89,11 +89,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2'
-          memory: 4G
-        reservations:
           cpus: '1'
-          memory: 2G
+          memory: 512M  # 超低メモリ環境向け
+        reservations:
+          cpus: '0.5'
+          memory: 256M
 
   # ChromaDB for vector storage
   chromadb:
@@ -114,8 +114,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 2G
+          cpus: '0.5'
+          memory: 256M  # ChromaDBも最小限に
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
       interval: 30s
@@ -164,7 +164,7 @@ services:
       - okami-network
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
-  # Ollama for local embeddings - Ubuntu最適化版
+  # Ollama for local embeddings - Ubuntu超低メモリ環境最適化版（1GB RAM + 4GB Swap）
   ollama:
     image: ollama/ollama:latest
     container_name: okami-ollama
@@ -172,33 +172,36 @@ services:
       - "11434"
     volumes:
       - ollama-data:/root/.ollama
-      - ./scripts/ollama-entrypoint-ubuntu.sh:/entrypoint.sh:ro
+      - ./scripts/ollama-entrypoint-ubuntu-minimal.sh:/entrypoint.sh:ro
     environment:
       - OLLAMA_HOST=0.0.0.0
-      - OLLAMA_NUM_PARALLEL=1  # バッチ処理を無効化（エラー回避）
-      - OLLAMA_MAX_LOADED_MODELS=1  # エンベディングモデル1つに制限
-      - OLLAMA_KEEP_ALIVE=10m  # モデルをメモリに長く保持
-      - OLLAMA_MODELS=/root/.ollama/models  # モデルパスを明示
-      - OLLAMA_DEBUG=${OLLAMA_DEBUG:-0}  # デバッグログ（環境変数で制御）
-      # CPU最適化設定
-      - OLLAMA_NUM_THREADS=4  # CPUスレッド数を制限
+      - OLLAMA_NUM_PARALLEL=1  # バッチ処理を無効化（メモリ節約）
+      - OLLAMA_MAX_LOADED_MODELS=1  # モデル1つのみ
+      - OLLAMA_KEEP_ALIVE=1m  # メモリ節約のため短時間のみ保持
+      - OLLAMA_MODELS=/root/.ollama/models
+      - OLLAMA_DEBUG=${OLLAMA_DEBUG:-0}
+      # 超低メモリ環境向け最適化
+      - OLLAMA_NUM_THREADS=1  # CPUスレッドを1つに制限
+      - OLLAMA_NOPREALLOCATE=1  # メモリの事前割り当てを無効化
+      - OLLAMA_FLASH_ATTENTION=0  # Flash Attentionを無効化（メモリ節約）
+      - GOMAXPROCS=1  # Goランタイムのプロセス数を制限
     networks:
       - okami-network
     restart: always
     deploy:
       resources:
         limits:
-          cpus: '2'
-          memory: 8G  # メモリを増加
+          cpus: '1'  # CPU使用を1コアに制限
+          memory: 512M  # メモリ制限を512MBに削減
         reservations:
-          cpus: '1'
-          memory: 4G  # 最小メモリも増加
+          cpus: '0.5'
+          memory: 256M  # 最小256MB
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 60s  # インターバルを長く
-      timeout: 30s  # タイムアウトを長く
-      retries: 10  # リトライ回数を増やす
-      start_period: 900s  # 起動期間を15分に延長
+      interval: 120s  # ヘルスチェック頻度を下げる
+      timeout: 60s  # タイムアウトを延長
+      retries: 20  # リトライ回数を増やす
+      start_period: 1800s  # 起動期間を30分に延長
     entrypoint: ["/bin/bash", "/entrypoint.sh"]
 
   # Optional: Monitoring with Prometheus Node Exporter

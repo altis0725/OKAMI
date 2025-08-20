@@ -15,10 +15,10 @@ server_pid=$!
 
 # サーバーの準備完了を待機（Ubuntu環境用に長めの待機時間）
 echo "Waiting for Ollama server to be ready (this may take several minutes on Ubuntu)..."
-MAX_WAIT=600  # 10分に延長
+MAX_WAIT=180  # 3分に延長
 WAITED=0
 RETRY_COUNT=0
-MAX_RETRIES=120  # 120回リトライ（10分）
+MAX_RETRIES=120  # 120回リトライ（3分）
 
 while [[ $RETRY_COUNT -lt $MAX_RETRIES ]]; do
     if curl -s --connect-timeout 5 http://localhost:11434/api/tags > /dev/null 2>&1; then

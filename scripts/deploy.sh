@@ -166,26 +166,100 @@ setup_environment() {
         fi
     fi
     
-    # Ubuntu環境の場合、Ubuntu用環境変数ファイルもチェック
+    # Ubuntu環境の場合、メモリサイズに応じた環境変数ファイルを設定
     if [ -f /etc/os-release ]; then
         . /etc/os-release
         if [ "$ID" = "ubuntu" ]; then
+            # メモリサイズの確認
+            TOTAL_MEM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+            TOTAL_MEM_GB=$((TOTAL_MEM_KB / 1024 / 1024))
+            
+            log "Detected Ubuntu with ${TOTAL_MEM_GB}GB RAM"
+            
             if [ ! -f "${APP_DIR}/.env.production.ubuntu" ]; then
                 log "Creating Ubuntu-specific environment file..."
-                cat > ${APP_DIR}/.env.production.ubuntu << 'EOF'
-# Ubuntu本番環境専用の環境変数設定
+                
+                if [ ${TOTAL_MEM_GB} -le 1 ]; then
+                    # 1GB以下のメモリ環境（超低スペック）
+                    log "Configuring for ultra-low memory environment (1GB RAM)..."
+                    cat > ${APP_DIR}/.env.production.ubuntu << 'EOF'
+# Ubuntu本番環境専用の環境変数設定（1GB RAM + 4GB Swap環境）
+EMBEDDER_MODEL=nomic-embed-text:v1.5
+OLLAMA_MODEL=nomic-embed-text:v1.5
+CREWAI__EMBEDDINGS__MODEL=nomic-embed-text:v1.5
+REQUEST_TIMEOUT=1800
+EMBEDDINGS_TIMEOUT=900
+TASK_TIMEOUT=3600
+OLLAMA_RETRY_COUNT=20
+OLLAMA_RETRY_DELAY=60
+MAX_WORKERS=1
+OLLAMA_NUM_THREADS=1
+OLLAMA_KEEP_ALIVE=30s
+OLLAMA_NUM_PARALLEL=1
+OLLAMA_MAX_LOADED_MODELS=1
+OLLAMA_NOPREALLOCATE=1
+OLLAMA_FLASH_ATTENTION=0
+BATCH_SIZE=1
+EMBEDDING_BATCH_SIZE=1
+OLLAMA_DEBUG=0
+OLLAMA_MONITOR=1
+GOMAXPROCS=1
+GOMEMLIMIT=256MiB
+EOF
+                elif [ ${TOTAL_MEM_GB} -le 2 ]; then
+                    # 2GB以下のメモリ環境（低スペック）
+                    log "Configuring for low memory environment (2GB RAM)..."
+                    cat > ${APP_DIR}/.env.production.ubuntu << 'EOF'
+# Ubuntu本番環境専用の環境変数設定（2GB RAM環境）
 EMBEDDER_MODEL=all-minilm:v2
 OLLAMA_MODEL=all-minilm:v2
-REQUEST_TIMEOUT=600
-EMBEDDING_TIMEOUT=600
-TASK_TIMEOUT=1200
+CREWAI__EMBEDDINGS__MODEL=all-minilm:v2
+REQUEST_TIMEOUT=900
+EMBEDDINGS_TIMEOUT=600
+TASK_TIMEOUT=1800
 OLLAMA_RETRY_COUNT=15
 OLLAMA_RETRY_DELAY=30
 MAX_WORKERS=2
-OLLAMA_NUM_THREADS=4
+OLLAMA_NUM_THREADS=2
+OLLAMA_KEEP_ALIVE=5m
+OLLAMA_NUM_PARALLEL=1
+OLLAMA_MAX_LOADED_MODELS=1
+BATCH_SIZE=5
+EMBEDDING_BATCH_SIZE=5
 OLLAMA_DEBUG=0
 EOF
-                log "✓ Ubuntu environment file created"
+                else
+                    # 通常のメモリ環境
+                    log "Configuring for standard memory environment (${TOTAL_MEM_GB}GB RAM)..."
+                    cat > ${APP_DIR}/.env.production.ubuntu << 'EOF'
+# Ubuntu本番環境専用の環境変数設定
+EMBEDDER_MODEL=mxbai-embed-large
+OLLAMA_MODEL=mxbai-embed-large
+CREWAI__EMBEDDINGS__MODEL=mxbai-embed-large
+REQUEST_TIMEOUT=600
+EMBEDDINGS_TIMEOUT=300
+TASK_TIMEOUT=1200
+OLLAMA_RETRY_COUNT=10
+OLLAMA_RETRY_DELAY=20
+MAX_WORKERS=4
+OLLAMA_NUM_THREADS=4
+OLLAMA_KEEP_ALIVE=10m
+OLLAMA_DEBUG=0
+EOF
+                fi
+                
+                log "✓ Ubuntu environment file created for ${TOTAL_MEM_GB}GB RAM"
+            fi
+            
+            # スワップファイルの確認と設定（1GB環境の場合）
+            if [ ${TOTAL_MEM_GB} -le 1 ]; then
+                SWAP_TOTAL_KB=$(grep SwapTotal /proc/meminfo | awk '{print $2}')
+                SWAP_TOTAL_GB=$((SWAP_TOTAL_KB / 1024 / 1024))
+                
+                if [ ${SWAP_TOTAL_GB} -lt 4 ]; then
+                    warning "Low swap space detected (${SWAP_TOTAL_GB}GB). Recommended: 4GB+"
+                    warning "To add swap: sudo fallocate -l 4G /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile"
+                fi
             fi
         fi
     fi
@@ -249,6 +323,32 @@ start_services() {
     
     cd ${APP_DIR}
     
+    # メモリサイズの確認（1GB環境の特別処理）
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        if [ "$ID" = "ubuntu" ]; then
+            TOTAL_MEM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+            TOTAL_MEM_GB=$((TOTAL_MEM_KB / 1024 / 1024))
+            
+            if [ ${TOTAL_MEM_GB} -le 1 ]; then
+                log "Preparing for 1GB RAM deployment..."
+                
+                # Dockerのメモリ使用を最小化
+                docker system prune -af --volumes || true
+                
+                # スワップをクリア（可能な限りメモリを確保）
+                sudo swapoff -a && sudo swapon -a 2>/dev/null || true
+                
+                # 起動前にスクリプトを確実に配置
+                if [ -f ./scripts/ollama-entrypoint-ubuntu-minimal.sh ]; then
+                    cp ./scripts/ollama-entrypoint-ubuntu-minimal.sh ./scripts/ollama-entrypoint-ubuntu.sh
+                    chmod +x ./scripts/ollama-entrypoint-ubuntu.sh
+                    log "✓ Ultra-low memory Ollama script applied"
+                fi
+            fi
+        fi
+    fi
+    
     # 既存のコンテナを停止
     docker-compose -f docker-compose.prod.yaml down
     
@@ -262,16 +362,30 @@ start_services() {
     # Ollamaの起動を確認（エンベディングモデルが正常に起動するまで待機）
     log "Waiting for Ollama to be ready..."
     
-    # Ubuntu環境の検出
+    # Ubuntu環境の検出とメモリサイズの確認
     IS_UBUNTU=false
+    UBUNTU_MODEL="mxbai-embed-large"  # デフォルトモデル
     if [ -f /etc/os-release ]; then
         . /etc/os-release
         if [ "$ID" = "ubuntu" ]; then
             IS_UBUNTU=true
-            log "Ubuntu environment detected - using lightweight model"
             
-            # Ubuntu環境用の拡張待機時間
-            MAX_OLLAMA_WAIT=300  # 5分に延長
+            # メモリサイズの確認
+            TOTAL_MEM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+            TOTAL_MEM_GB=$((TOTAL_MEM_KB / 1024 / 1024))
+            
+            if [ ${TOTAL_MEM_GB} -le 1 ]; then
+                log "Ultra-low memory Ubuntu detected (1GB) - using minimal model"
+                UBUNTU_MODEL="nomic-embed-text:v1.5"
+                MAX_OLLAMA_WAIT=1800  # 30分（スワップ使用を考慮）
+            elif [ ${TOTAL_MEM_GB} -le 2 ]; then
+                log "Low memory Ubuntu detected (2GB) - using lightweight model"
+                UBUNTU_MODEL="all-minilm:v2"
+                MAX_OLLAMA_WAIT=600  # 10分
+            else
+                log "Ubuntu environment detected - standard configuration"
+                MAX_OLLAMA_WAIT=300  # 5分
+            fi
         else
             MAX_OLLAMA_WAIT=60
         fi
@@ -285,19 +399,36 @@ start_services() {
             warning "Ollama is taking longer to start, continuing anyway..."
             break
         fi
-        sleep 5
-        OLLAMA_WAITED=$((OLLAMA_WAITED + 5))
-        info "Waiting for Ollama... ${OLLAMA_WAITED}s"
+        
+        # 1GB環境では進捗を詳細に表示
+        if [ ${TOTAL_MEM_GB} -le 1 ] && [ $((OLLAMA_WAITED % 60)) -eq 0 ]; then
+            info "Still waiting for Ollama (using swap)... ${OLLAMA_WAITED}s / ${MAX_OLLAMA_WAIT}s"
+        else
+            sleep 5
+            OLLAMA_WAITED=$((OLLAMA_WAITED + 5))
+            info "Waiting for Ollama... ${OLLAMA_WAITED}s"
+        fi
     done
     
     if docker exec okami-ollama curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
         log "✓ Ollama is ready"
         
-        # Ubuntu環境の場合、軽量モデルをプリロード
+        # Ubuntu環境の場合、適切なモデルをプリロード
         if [ "$IS_UBUNTU" = true ]; then
-            log "Preloading lightweight model for Ubuntu..."
-            docker exec okami-ollama ollama pull all-minilm:v2 || warning "Model pull failed, but continuing..."
-            docker exec okami-ollama ollama run all-minilm:v2 "test" || warning "Model initialization failed, but continuing..."
+            log "Preloading ${UBUNTU_MODEL} model for Ubuntu..."
+            
+            # 1GB環境の場合は特別な処理
+            if [ ${TOTAL_MEM_GB} -le 1 ]; then
+                warning "Model loading will be very slow due to swap usage"
+                docker exec okami-ollama timeout 1800 ollama pull ${UBUNTU_MODEL} || warning "Model pull timed out or failed"
+            else
+                docker exec okami-ollama ollama pull ${UBUNTU_MODEL} || warning "Model pull failed, but continuing..."
+            fi
+            
+            # モデルの初期化テスト（1GB環境ではスキップ可能）
+            if [ ${TOTAL_MEM_GB} -gt 1 ]; then
+                docker exec okami-ollama ollama run ${UBUNTU_MODEL} "test" || warning "Model initialization failed, but continuing..."
+            fi
         fi
     fi
     
