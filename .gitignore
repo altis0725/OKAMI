@@ -10,8 +10,11 @@ dist/
 downloads/
 eggs/
 .eggs/
+# Python lib directories (but not WebUI lib)
 lib/
 lib64/
+# Allow WebUI lib directory
+!webui/nextjs-chat/src/lib/
 parts/
 sdist/
 var/
