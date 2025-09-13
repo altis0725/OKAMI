@@ -10,6 +10,7 @@ from pathlib import Path
 import structlog
 
 from crewai import Crew, Agent, Task, LLM
+import crewai as _crewai_pkg
 from crewai.memory.external.external_memory import ExternalMemory
 from core.memory_manager import MemoryManager
 from core.knowledge_manager import KnowledgeManager
@@ -41,7 +42,7 @@ class CrewFactory:
         self.config = get_config()
         self.active_crews: Dict[str, Crew] = {}
         
-        # Monica LLMの初期化
+        # Monica LLMの初期化（既定のまま保持）
         self.monica_llm = LLM(
             model="gpt-4o",
             api_key=os.environ.get("MONICA_API_KEY"),
@@ -426,7 +427,8 @@ class CrewFactory:
                 "provider": "ollama",  # ollamaを使用
                 "config": {
                     "model": embedder_model,
-                    "url": f"{ollama_base_url}/api/embeddings"
+                    # CrewAI 側は base_url を想定
+                    "base_url": ollama_base_url
                 }
             }
             
@@ -462,42 +464,91 @@ class CrewFactory:
             config.setdefault("cache", True)
             config.setdefault("verbose", True)
             
-            # embedder設定を追加（Qdrantを使わない設定、バックアップ版の復元）
-            config["embedder"] = embedder_config
+            # CrewAI のバージョンにより crew レベルの embedder バリデーションが厳しく
+            # `ollama` が未対応扱いになるケースがあるため、ここでは設定しない。
+            # 知識の埋め込みは KnowledgeManager 側で処理する。
             
             # mem0を使用する場合は、external_memoryとして設定（バックアップ版の復元）
             memory_config = config.get("memory_config", {})
             mem0_config = config.get("mem0_config", {})
             
-            # mem0_configが存在し、MEM0_API_KEYがある場合はexternal_memoryを設定
-            if mem0_config and os.getenv("MEM0_API_KEY"):
+            # env優先: USE_MEM0=true かつ MEM0_API_KEY があれば、YAMLが無くてもmem0を有効化
+            use_mem0_env = os.getenv("USE_MEM0", "false").lower() == "true"
+            mem0_api_key = os.getenv("MEM0_API_KEY")
+            if (mem0_config or use_mem0_env) and mem0_api_key:
                 try:
-                    # mem0_configからuser_idを取得
-                    mem0_user_id = mem0_config.get("user_id", "okami_system")
+                    # user_id はYAML優先、なければ環境変数 MEM0_USER_ID、最後に既定
+                    mem0_user_id = mem0_config.get("user_id") or os.getenv("MEM0_USER_ID", "okami_system")
                     
                     # ExternalMemoryを使用する設定（Mem0用）
                     from crewai.memory.external.external_memory import ExternalMemory
                     
-                    # Mem0を使用する場合、embedder_configにMem0の設定全体を含める
-                    external_memory = ExternalMemory(
-                        embedder_config={
-                            "provider": "mem0",
-                            "config": {
-                                "user_id": mem0_user_id,
-                                "api_key": os.getenv("MEM0_API_KEY")
+                    # Mem0を使用する場合のExternalMemory（CrewAI 0.186系）
+                    # crewai のバージョン差異に対応
+                    def _parse_ver(v: str):
+                        try:
+                            parts = [int(p) for p in v.split(".")[:3]]
+                            while len(parts) < 3:
+                                parts.append(0)
+                            return tuple(parts)
+                        except Exception:
+                            return (0, 0, 0)
+
+                    _ver = _parse_ver(getattr(_crewai_pkg, "__version__", "0.0.0"))
+
+                    # まず新仕様（0.160+）で試行し、失敗時に旧仕様（0.159系）にフォールバック
+                    external_memory = None
+                    try:
+                        if _ver >= (0, 160, 0):
+                            # 新仕様では memory_config のみで初期化できる実装がある。
+                            # まず embedder_config を渡さずに試行し、失敗時に embedder_config を追加して再試行。
+                            try:
+                                external_memory = ExternalMemory(
+                                    memory_config={
+                                        "provider": "mem0",
+                                        "config": {
+                                            "user_id": mem0_user_id,
+                                            "api_key": mem0_api_key,
+                                            "api_version": "v2"
+                                        }
+                                    }
+                                )
+                            except Exception:
+                                external_memory = ExternalMemory(
+                                    embedder_config=embedder_config,
+                                    memory_config={
+                                        "provider": "mem0",
+                                        "config": {
+                                            "user_id": mem0_user_id,
+                                            "api_key": mem0_api_key,
+                                            "api_version": "v2"
+                                        }
+                                    }
+                                )
+                        else:
+                            raise ValueError("force_fallback_old_style")
+                    except Exception as _e:
+                        # 旧仕様: embedder_config.provider に mem0 を指定
+                        external_memory = ExternalMemory(
+                            embedder_config={
+                                "provider": "mem0",
+                                "config": {
+                                    "user_id": mem0_user_id,
+                                    "api_key": mem0_api_key,
+                                    "api_version": "v2"
+                                }
                             }
-                        }
-                    )
+                        )
                     
                     # CrewAIの正しい設定方法に従って設定
                     config["memory"] = True  # メモリを有効化
-                    config["external_memory"] = external_memory  # ExternalMemoryを設定
+                    config["external_memory"] = external_memory  # ExternalMemoryを設定（mem0は内部でAPIキー参照）
                     
                     # mem0_configは削除（処理済みのため）
                     if "mem0_config" in config:
                         del config["mem0_config"]
                     
-                    logger.info("Mem0 external memory configured", user_id=mem0_user_id)
+                    logger.info("Mem0 external memory configured", user_id=mem0_user_id, via_env=use_mem0_env and not mem0_config)
                     
                 except Exception as e:
                     logger.error(f"Failed to configure mem0 external memory: {e}")
@@ -548,9 +599,12 @@ class CrewFactory:
             
             # エンベッダー設定の処理
             # memory_config.providerに関わらず、knowledge_sourcesがある場合は常にembedderを設定
-            if knowledge_sources or config.get("embedder"):
-                # embedder設定は既に上で設定済み
-                pass
+            # ただし CrewAI の Crew 構築時に provider バリデーションが厳しく
+            # "ollama" が未対応扱いになる場合があるため、Crew へは embedder を渡さない。
+            # YAML に embedder が含まれていても除去する。
+            if "embedder" in config:
+                del config["embedder"]
+                logger.info("Removed embedder from crew config to avoid validation issues")
             
             # Evolution Crewの場合、コールバックを追加
             if crew_name == "evolution_crew":

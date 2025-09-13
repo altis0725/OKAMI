@@ -152,6 +152,37 @@ curl http://localhost:8000/tasks
 curl http://localhost:8000/tasks/{task_id}
 ```
 
+### 運用確認用エンドポイント
+
+```bash
+# アプリ全体のヘルス
+curl http://localhost:8000/health
+
+# 埋め込み（Embedding）プロバイダのヘルス（Ollama / モデル / healthy）
+curl http://localhost:8000/api/embed/health
+
+# Mem0 の接続確認（ENV で USE_MEM0=true, MEM0_API_KEY 設定時）
+curl http://localhost:8000/mem0/health
+```
+
+### .env / 環境変数での運用設定
+
+- Mem0 を YAML ではなく ENV で有効化
+  - `USE_MEM0=true`
+  - `MEM0_API_KEY=...`（必須）
+  - `MEM0_USER_ID=okami_main_crew`（任意）
+
+- ログ／ナレッジ／Chroma の永続化（単一ボリューム配下に集約）
+  - `OKAMI_LOG_DIR=/app/storage/logs`
+  - `KNOWLEDGE_DIR=/app/storage/knowledge`
+  - `CHROMA_PERSIST_DIRECTORY=/app/storage/chroma`
+
+- Chroma 書き込みタイムアウト緩和（リトライ制御）
+  - `CHROMA_ADD_MAX_RETRIES`（既定3）
+  - `CHROMA_ADD_RETRY_INITIAL_DELAY`（既定0.2秒）
+  - `CHROMA_QUERY_MAX_RETRIES`（既定3）
+  - `CHROMA_QUERY_INITIAL_DELAY`（既定0.2秒）
+
 ### Pythonクライアントでの利用
 
 ```python

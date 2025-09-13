@@ -24,6 +24,8 @@ from crewai import Crew, Agent, Task
 from crews import CrewFactory
 from evolution.improvement_parser import ImprovementParser
 from evolution.improvement_applier import ImprovementApplier
+from core.embedding_manager import get_embedding_manager
+from utils.mem0_helper import Mem0StatusChecker
 
 # ロギングの初期化
 logger = initialize_logger()
@@ -43,7 +45,12 @@ improvement_queue: List[Dict[str, Any]] = []
 async def lifespan(app: FastAPI):
     """アプリケーションライフスパンマネージャー"""
     # 起動時
-    app_logger.info("OKAMI system starting up", version="0.1.0")
+    try:
+        import crewai as _crewai_pkg
+        _crewai_ver = getattr(_crewai_pkg, "__version__", "unknown")
+    except Exception:
+        _crewai_ver = "unknown"
+    app_logger.info("OKAMI system starting up", version="0.1.0", crewai_version=_crewai_ver)
     
     # システム情報のログ
     app_logger.info(
@@ -83,6 +90,19 @@ if static_path.exists():
 # Next.js 静的ファイルのマウント
 webui_static = Path(__file__).parent / "webui" / "static"  # build-ui.shでコピーされる場所
 webui_nextjs_out = Path(__file__).parent / "webui" / "nextjs-chat" / "out"  # Next.jsビルド出力
+
+# UI 配信ディレクトリの存在をログ
+try:
+    app_logger.info(
+        "UI static directories",
+        webui_static=str(webui_static),
+        webui_static_exists=webui_static.exists(),
+        webui_nextjs_out=str(webui_nextjs_out),
+        webui_nextjs_out_exists=webui_nextjs_out.exists(),
+    )
+except Exception:
+    # ログ初期化前でもアプリ起動は継続させる
+    pass
 
 # 優先順位: 1. static/ (build-ui.sh実行後), 2. nextjs-chat/out (npm run build後)
 if webui_static.exists():
@@ -178,30 +198,60 @@ async def health_check():
         )
 
 
+@app.get("/embed/health", tags=["System"])
+async def embed_health_check():
+    """埋め込み(Embedding)プロバイダのヘルスチェック"""
+    try:
+        manager = get_embedding_manager()
+        ok, status = manager.health_check()
+        return {
+            "provider": manager.provider,
+            "model": getattr(manager, "model", "unknown"),
+            "healthy": bool(ok),
+            "status": status,
+        }
+    except Exception as e:
+        app_logger.error("Embedding health check failed", error=str(e))
+        return JSONResponse(
+            status_code=503,
+            content={
+                "provider": "unknown",
+                "healthy": False,
+                "error": str(e),
+            },
+        )
+
+
+@app.get("/api/embed/health", tags=["System"])
+async def embed_health_check_api():
+    """/api 配下のエイリアス"""
+    return await embed_health_check()
+
+
 @app.get("/status", response_model=SystemStatus, tags=["System"])
 async def get_system_status():
     """システムステータスを取得"""
     try:
         # アクティブなクルーを取得
         active_crews = crew_factory.get_active_crews()
-        
+
         # 最近の品質スコアを計算
         recent_tasks = [
             task for task in task_history.values()
             if task.get("timestamp") and 
             (datetime.utcnow() - task["timestamp"]).seconds < 3600
         ]
-        
+
         quality_scores = []
         for task in recent_tasks:
             if "quality_score" in task:
                 quality_scores.append(task["quality_score"])
-        
+
         avg_quality_score = (
             sum(quality_scores) / len(quality_scores) 
             if quality_scores else 0.0
         )
-        
+
         return SystemStatus(
             status="healthy",
             active_crews=len(active_crews),
@@ -209,10 +259,21 @@ async def get_system_status():
             recent_quality_score=avg_quality_score,
             pending_improvements=len(improvement_queue)
         )
-        
+
     except Exception as e:
         app_logger.error("Failed to get system status", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/mem0/health", tags=["System"])
+async def mem0_health_check():
+    """Mem0 接続ヘルスチェック（ENVベース）"""
+    try:
+        status = Mem0StatusChecker.check_mem0_availability()
+        return status
+    except Exception as e:
+        app_logger.error("Mem0 health check failed", error=str(e))
+        return JSONResponse(status_code=503, content={"ready": False, "error": str(e)})
 
 
 @app.get("/tasks/recent", tags=["Tasks"])
@@ -913,7 +974,21 @@ async def serve_app():
 async def catch_all(path: str):
     """Next.js SPAのクライアントサイドルーティング対応"""
     # APIパスは除外
-    if path.startswith("api/") or path.startswith("_next/") or path in ["health", "docs", "openapi.json", "tasks", "crews", "agents", "monitoring", "improvements"]:
+    if (
+        path.startswith("api/")
+        or path.startswith("_next/")
+        or path.startswith("embed/")
+        or path in [
+            "health",
+            "docs",
+            "openapi.json",
+            "tasks",
+            "crews",
+            "agents",
+            "monitoring",
+            "improvements",
+        ]
+    ):
         raise HTTPException(status_code=404, detail="Not found")
     
     # Next.js index.htmlを返す

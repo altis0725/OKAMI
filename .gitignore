@@ -40,6 +40,7 @@ env/
 .env
 .env.*
 !.env.*example
+!.env.railway
 
 # Logs
 logs/

@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Any
 from pathlib import Path
 import structlog
 from crewai.memory.external.external_memory import ExternalMemory
+import crewai as _crewai_pkg
 from crewai.utilities.paths import db_storage_path
 
 from .graph_memory_manager import GraphMemoryManager
@@ -88,28 +89,55 @@ class MemoryManager:
             return
         
         try:
-            # ExternalMemory（新方式）での初期化を試みる - V2 API対応
-            self.external_memory = ExternalMemory(
-                embedder_config={
-                    "provider": "ollama",
-                    "config": {
-                        "model": "nomic-embed-text:latest",
-                        "base_url": "http://localhost:11434"
+            # crewai バージョン差異に対応
+            def _parse_ver(v: str):
+                try:
+                    parts = [int(p) for p in v.split(".")[:3]]
+                    while len(parts) < 3:
+                        parts.append(0)
+                    return tuple(parts)
+                except Exception:
+                    return (0, 0, 0)
+
+            _ver = _parse_ver(getattr(_crewai_pkg, "__version__", "0.0.0"))
+
+            if _ver < (0, 160, 0):
+                # crewai 0.159 系: embedder_config.provider に mem0 を指定
+                self.external_memory = ExternalMemory(
+                    embedder_config={
+                        "provider": "mem0",
+                        "config": {
+                            "user_id": self.mem0_config.get("user_id", "okami_system"),
+                            "run_id": self.mem0_config.get("run_id"),
+                            "org_id": self.mem0_config.get("org_id"),
+                            "project_id": self.mem0_config.get("project_id"),
+                            "api_key": mem0_api_key,
+                            "api_version": "v2"
+                        }
                     }
-                },
-                memory_config={
-                    "provider": "mem0",
-                    "config": {
-                        "user_id": self.mem0_config.get("user_id", "okami_system"),
-                        "run_id": self.mem0_config.get("run_id"),
-                        "org_id": self.mem0_config.get("org_id"),
-                        "project_id": self.mem0_config.get("project_id"),
-                        "api_key": mem0_api_key,
-                        # V2 API対応の追加設定
-                        "api_version": "v2"
+                )
+            else:
+                # crewai 0.160+ 系: embedder_config は埋め込み、memory_config で mem0
+                self.external_memory = ExternalMemory(
+                    embedder_config={
+                        "provider": "ollama",
+                        "config": {
+                            "model": "nomic-embed-text:latest",
+                            "base_url": "http://localhost:11434"
+                        }
+                    },
+                    memory_config={
+                        "provider": "mem0",
+                        "config": {
+                            "user_id": self.mem0_config.get("user_id", "okami_system"),
+                            "run_id": self.mem0_config.get("run_id"),
+                            "org_id": self.mem0_config.get("org_id"),
+                            "project_id": self.mem0_config.get("project_id"),
+                            "api_key": mem0_api_key,
+                            "api_version": "v2"
+                        }
                     }
-                }
-            )
+                )
             self.mem0_initialized = True
             logger.info("Mem0 ExternalMemory initialized successfully (V2 API)")
             

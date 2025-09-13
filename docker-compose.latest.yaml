@@ -1,3 +1,7 @@
+# 最新版Docker Compose設定（十分なテスト後の使用推奨）
+# ⚠️ 警告: ChromaDB 1.0.x系への移行は不可逆的です
+# ⚠️ 使用前に必ずデータのフルバックアップを実行してください
+
 services:
   # Main OKAMI service
   okami:
@@ -18,21 +22,24 @@ services:
       - LOG_LEVEL=INFO
       - OLLAMA_HOST=http://ollama:11434
       - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_API_BASE_URL=http://ollama:11434  # 新バージョン用
       - EMBEDDER_PROVIDER=ollama
       - EMBEDDER_MODEL=mxbai-embed-large
       - VECTOR_STORE_TYPE=chroma
       - CHROMA_HOST=chromadb
       - CHROMA_PORT=8000
-      # ChromaDBをHTTPクライアントモードで使用（永続化はChromaDB側で管理）
+      # ChromaDB 1.0.x系用の設定
       - CHROMA_PERSIST_DIRECTORY=
       - USE_QDRANT=false
-      # CrewAI内部メモリ用のChroma設定
       - CHROMA_SERVER_HOST=chromadb
       - CHROMA_SERVER_HTTP_PORT=8000
       # CrewAI知識ベース用の設定
       - CREWAI__EMBEDDINGS__PROVIDER=ollama
       - CREWAI__EMBEDDINGS__MODEL=mxbai-embed-large
       - CREWAI__EMBEDDINGS__BASE_URL=http://ollama:11434
+      # 新版での推奨設定
+      - CREWAI_MEMORY_PROVIDER=basic
+      - CREWAI_EMBEDDINGS_BATCH_SIZE=10
     env_file:
       - .env
     networks:
@@ -48,45 +55,28 @@ services:
       retries: 3
       start_period: 60s
 
-  # Claude Code Quality Monitor service
-  claude-monitor:
-    build:
-      context: .
-      dockerfile: Dockerfile.monitor
-    container_name: okami-quality-monitor
-    volumes:
-      - ./monitoring:/app/monitoring
-      - ./logs:/app/logs
-    environment:
-      - OKAMI_API_URL=http://okami:8000
-      - QUALITY_CHECK_INTERVAL=30
-      - LOG_LEVEL=INFO
-    env_file:
-      - .env
-    depends_on:
-      okami:
-        condition: service_healthy
-    networks:
-      - okami-network
-    restart: unless-stopped
-
-  # ChromaDB for vector storage（最新版対応設定）
+  # ChromaDB for vector storage（1.0.x系設定）
   chromadb:
-    image: chromadb/chroma:0.5.23  # CrewAIとの互換性確保のため0.5.23に固定
+    image: chromadb/chroma:1.0.20  # ⚠️ 最新版 - データ移行に注意
     container_name: okami-chromadb
     ports:
       - "8001:8000"
     volumes:
-      - chroma-data:/chroma/chroma  # 将来の1.0.x系では /data に変更予定
+      - chroma-data:/data  # 1.0.x系では /data がデフォルト
+      - ./config/chroma:/chroma/config:ro  # 設定ファイル用（必要時）
     environment:
       - IS_PERSISTENT=TRUE
       - ANONYMIZED_TELEMETRY=FALSE
-      - CHROMA_SERVER_CORS_ALLOW_ORIGINS=["*"]  # CORS設定追加
+      - CHROMA_SERVER_CORS_ALLOW_ORIGINS=["*"]
       - CHROMA_SERVER_HOST=0.0.0.0
       - CHROMA_SERVER_HTTP_PORT=8000
-      # 1.0.x系移行時に必要な設定（現在はコメントアウト）
-      # - CHROMA_SERVER_AUTHN_CREDENTIALS_FILE=/chroma/credentials
-      # - CHROMA_SERVER_AUTHN_PROVIDER=chromadb.auth.token_authn.TokenAuthenticationServerProvider
+      # 1.0.x系の新しい認証設定（必要に応じて有効化）
+      # - CHROMA_SERVER_AUTHN_CREDENTIALS_FILE=/chroma/config/credentials.json
+      # - CHROMA_SERVER_AUTHN_PROVIDER=chromadb.auth.token.TokenAuthenticationServerProvider
+      # - CHROMA_SERVER_AUTHZ_PROVIDER=chromadb.auth.simple.SimpleAuthorizationProvider
+      # パフォーマンス設定
+      - CHROMA_SEGMENT_CACHE_POLICY=LRU
+      - CHROMA_COLLECTION_CACHE_SIZE=10
     networks:
       - okami-network
     restart: unless-stopped
@@ -97,9 +87,9 @@ services:
       retries: 3
       start_period: 60s
 
-  # Ollama for local embeddings（最新版対応）
+  # Ollama for local embeddings（最新版）
   ollama:
-    image: ollama/ollama:latest  # 最新版を使用（元の設定に戻す）
+    image: ollama/ollama:0.5.3  # 最新安定版
     container_name: okami-ollama
     ports:
       - "11434:11434"
@@ -108,34 +98,50 @@ services:
       - ./scripts/ollama-entrypoint.sh:/entrypoint.sh:ro
     environment:
       - OLLAMA_HOST=0.0.0.0
-      - OLLAMA_ORIGINS=*  # CORS設定（v0.5.0以降で必要）
-      - OLLAMA_NUM_PARALLEL=1  # バッチ処理を無効化（エラー回避）
-      - OLLAMA_MAX_LOADED_MODELS=1  # エンベディングモデル1つに制限
-      - OLLAMA_KEEP_ALIVE=5m  # モデルをメモリに保持
-      - OLLAMA_MODELS=/root/.ollama/models  # モデルパスを明示
-      - OLLAMA_DEBUG=1  # デバッグログを有効化
-      - OLLAMA_API_BASE_URL=http://0.0.0.0:11434  # 明示的なAPI設定
+      - OLLAMA_ORIGINS=["*"]  # v0.5.0以降のCORS設定
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_KEEP_ALIVE=5m
+      - OLLAMA_MODELS=/root/.ollama/models
+      - OLLAMA_DEBUG=1
+      - OLLAMA_API_BASE_URL=http://0.0.0.0:11434
+      # v0.5.x系の新機能設定
+      - OLLAMA_THINKING_MODE=enabled  # 思考機能
+      - OLLAMA_TOOL_SUPPORT=true      # ツールサポート
     networks:
       - okami-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]  # 軽量エンドポイントに変更
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
       interval: 30s
       timeout: 15s
       retries: 5
-      start_period: 120s  # 起動時間を短縮
+      start_period: 120s
     entrypoint: ["/bin/bash", "/entrypoint.sh"]
     deploy:
       resources:
         limits:
-          memory: 8G  # メモリ上限を設定
+          memory: 8G
         reservations:
-          memory: 4G  # 最小メモリを確保
+          memory: 4G
 
 volumes:
   chroma-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/chroma  # 明示的なパス指定
   ollama-data:
+    driver: local
+    driver_opts:
+      type: none  
+      o: bind
+      device: ./data/ollama  # 明示的なパス指定
 
 networks:
   okami-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16  # 専用サブネット

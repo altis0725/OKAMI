@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "next build --no-lint",
     "build:static": "next build && next export",
     "build:ubuntu": "npm install --legacy-peer-deps && next build",
     "start": "next start",

@@ -17,7 +17,8 @@ class OkamiConfig(BaseSettings):
     """OKAMIシステムの設定クラス"""
 
     # API Keys
-    monica_api_key: str = Field(..., env="MONICA_API_KEY")
+    monica_api_key: Optional[str] = Field(None, env="MONICA_API_KEY")
+    openai_api_key: Optional[str] = Field(None, env="OPENAI_API_KEY")
     openai_api_base: str = Field(
         default="https://openapi.monica.im/v1",
         env="OPENAI_API_BASE"
@@ -32,7 +33,11 @@ class OkamiConfig(BaseSettings):
 
     # Server Settings
     server_host: str = Field(default="0.0.0.0", env="SERVER_HOST")
-    server_port: int = Field(default=8000, env="SERVER_PORT")
+    # Prefer Railway/Heroku style PORT if present; fallback to 8000
+    server_port: int = Field(
+        default_factory=lambda: int(os.getenv("PORT", "8000")),
+        env="SERVER_PORT",
+    )
     server_reload: bool = Field(default=False, env="SERVER_RELOAD")
 
     # Monitoring Settings
@@ -115,21 +120,57 @@ class OkamiConfig(BaseSettings):
             raise ValueError(f"Invalid embedder provider: {v}")
         return v.lower()
 
+    def is_railway_environment(self) -> bool:
+        """Railway環境かどうかを判定"""
+        return os.getenv("RAILWAY_ENVIRONMENT") is not None
+
+    def get_api_key(self) -> str:
+        """APIキーを取得（Railway環境を考慮）"""
+        if self.is_railway_environment():
+            # Railway環境ではMONICA_API_KEYまたはOPENAI_API_KEYを使用
+            return self.monica_api_key or self.openai_api_key
+        else:
+            # ローカル環境ではMONICA_API_KEYを優先
+            return self.monica_api_key or self.openai_api_key
+
     def get_embedder_config(self) -> Dict[str, Any]:
         """
         埋め込みモデルの設定を取得
-        Context7とコミュニティのベストプラクティスに基づく最適化設定
+        - 通常: .env / 環境変数の `EMBEDDER_PROVIDER` と `EMBEDDER_MODEL`
+        - Railway: `ENABLE_OLLAMA=true` の場合は Ollama を優先（サイドカー起動前提）
+                   それ以外は OpenAI を使用
         """
+        # 明示指定があれば最優先（REMOTE Ollamaなどのケースに対応）
+        explicit_provider = os.getenv("EMBEDDER_PROVIDER")
+        explicit_model = os.getenv("EMBEDDER_MODEL")
+
+        if explicit_provider:
+            provider = explicit_provider.lower()
+            model = explicit_model or self.embedder_model
+        elif self.is_railway_environment():
+            if os.getenv("ENABLE_OLLAMA", "false").lower() == "true":
+                provider = "ollama"
+                model = explicit_model or "mxbai-embed-large"
+            else:
+                provider = "openai"
+                model = "text-embedding-ada-002"
+        else:
+            provider = self.embedder_provider
+            model = self.embedder_model
+
         config = {
-            "provider": self.embedder_provider,
+            "provider": provider,
             "config": {
-                "model": self.embedder_model
+                "model": model
             }
         }
 
         # Add provider-specific configurations
-        if self.embedder_provider == "openai":
-            config["config"]["api_key"] = self.monica_api_key
+        if provider == "openai":
+            api_key = self.get_api_key()
+            if not api_key:
+                raise ValueError("OpenAI API key is required for embeddings")
+            config["config"]["api_key"] = api_key
             config["config"]["base_url"] = self.openai_api_base
             config["config"]["batch_size"] = self.embedding_batch_size
             config["config"]["max_retries"] = self.embedding_max_retries
@@ -138,33 +179,36 @@ class OkamiConfig(BaseSettings):
             config["config"]["api_key"] = os.getenv("GOOGLE_API_KEY")
         elif self.embedder_provider == "cohere" and os.getenv("COHERE_API_KEY"):
             config["config"]["api_key"] = os.getenv("COHERE_API_KEY")
-        elif self.embedder_provider == "huggingface" and self.huggingface_api_key:
+        elif provider == "huggingface" and self.huggingface_api_key:
             config["config"]["api_key"] = self.huggingface_api_key
             config["config"]["api_url"] = "https://api-inference.huggingface.co"
-        elif self.embedder_provider == "ollama":
+        elif provider == "ollama":
             # Ollama最適化設定（Context7 & コミュニティ推奨）
             config["config"].update({
                 "base_url": self.ollama_base_url,
                 "batch_size": self.embedding_batch_size,
                 "max_retries": self.embedding_max_retries,
                 "retry_delay": self.embedding_retry_delay,
-                # Ollama API最新仕様に対応
-                "api_endpoint": "/api/embed",  # 推奨エンドポイント
-                "truncate": True,  # コンテキスト長制限対応
-                "keep_alive": "5m",  # モデル保持時間
-                "verbose": True,  # 詳細ログ
-                "debug": True  # デバッグモード
+                # 互換メモ: Python SDK は /api/embeddings を内部で使用。記録のみ。
+                "api_endpoint": "/api/embeddings",
+                "truncate": True,
+                "keep_alive": "5m",
+                "verbose": True,
+                "debug": True
             })
 
         return config
 
     def get_llm_config(self, model: Optional[str] = None) -> Dict[str, Any]:
         """
-        LLM（大規模言語モデル）の設定を取得
+        LLM（大規模言語モデル）の設定を取得（Monica/OpenAI互換）
         """
+        api_key = self.get_api_key()
+        if not api_key:
+            raise ValueError("API key is required for LLM")
         return {
             "model": model or "gpt-4o-mini",
-            "api_key": self.monica_api_key,
+            "api_key": api_key,
             "base_url": self.openai_api_base,
         }
 

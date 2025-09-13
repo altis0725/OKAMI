@@ -1,0 +1,42 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# Railway固有の設定
+[variables]
+# Embeddings via internal Ollama service in private network
+EMBEDDER_PROVIDER = "ollama"
+EMBEDDER_MODEL = "mxbai-embed-large" 
+VECTOR_STORE_TYPE = "local"
+CHROMA_PERSIST_DIRECTORY = "/app/storage/chroma"
+CREWAI_STORAGE_DIR = "/app/storage"
+PYTHONUNBUFFERED = "1"
+SERVER_RELOAD = "false"
+OKAMI_LOG_JSON = "true"
+
+# セキュリティ：本番環境では DEBUG は無効にする
+OKAMI_LOG_LEVEL = "INFO"
+
+# Railway環境ではローカルファイルストレージを使用
+USE_MEM0 = "false"
+
+# Railway環境では外部サービスへの接続を避ける設定
+MONITOR_ENABLED = "false"
+
+# Railwayでは $PORT 環境変数が自動で設定される
+# Dockerfileとconfig.pyで自動的に使用される
+
+# Railway環境フラグ（utils/config.py の判定を有効化）
+RAILWAY_ENVIRONMENT = "1"
+
+# ---- Ollama (optional) ----
+# コンテナ内でollamaを起動する場合に有効化
+# ENABLE_OLLAMA = "true"
+# OLLAMA_BASE_URL = "http://127.0.0.1:11434"
+# OLLAMA_PULL_MODELS = "nomic-embed-text"   # カンマ区切りで複数指定可

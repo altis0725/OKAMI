@@ -17,6 +17,10 @@ import structlog
 #     MatchValue
 # )
 import chromadb
+try:
+    from chromadb.config import Settings as ChromaSettings  # 0.5.x
+except Exception:  # pragma: no cover
+    ChromaSettings = None
 import uuid
 
 logger = structlog.get_logger()
@@ -205,13 +209,23 @@ class ChromaVectorStore(VectorStore):
         if self.persist_directory and self.persist_directory != "":
             # ディレクトリが存在しない場合は作成
             os.makedirs(self.persist_directory, exist_ok=True)
-            self.client = chromadb.PersistentClient(path=self.persist_directory)
+            # テレメトリ無効化などの設定（ネットワーク依存を避ける）
+            if ChromaSettings is not None:
+                settings = ChromaSettings(anonymized_telemetry=False)
+                self.client = chromadb.PersistentClient(path=self.persist_directory, settings=settings)
+            else:
+                self.client = chromadb.PersistentClient(path=self.persist_directory)
         else:
             self.client = chromadb.HttpClient(
                 host=self.host,
                 port=self.port
             )
-        
+        # タイムアウト/リトライ設定（環境変数で調整可）
+        self.add_max_retries = int(os.getenv("CHROMA_ADD_MAX_RETRIES", "3"))
+        self.add_retry_initial_delay = float(os.getenv("CHROMA_ADD_RETRY_INITIAL_DELAY", "0.2"))
+        self.query_max_retries = int(os.getenv("CHROMA_QUERY_MAX_RETRIES", "3"))
+        self.query_retry_initial_delay = float(os.getenv("CHROMA_QUERY_INITIAL_DELAY", "0.2"))
+
         logger.info(
             "ChromaDB vector store initialized",
             host=self.host,
@@ -238,12 +252,31 @@ class ChromaVectorStore(VectorStore):
             if ids is None:
                 ids = [str(uuid.uuid4()) for _ in embeddings]
             
-            collection.upsert(
-                embeddings=embeddings,
-                documents=documents,
-                metadatas=metadatas,
-                ids=ids
-            )
+            # リトライ付きでupsert（NFS上のロック競合・I/O遅延に対応）
+            attempt = 0
+            delay = self.add_retry_initial_delay
+            while True:
+                try:
+                    collection.upsert(
+                        embeddings=embeddings,
+                        documents=documents,
+                        metadatas=metadatas,
+                        ids=ids
+                    )
+                    break
+                except Exception as e:
+                    attempt += 1
+                    if attempt > self.add_max_retries:
+                        raise
+                    logger.warning(
+                        "Chroma upsert timed out/failed, retrying",
+                        attempt=attempt,
+                        max_retries=self.add_max_retries,
+                        error=str(e)
+                    )
+                    import time
+                    time.sleep(delay)
+                    delay = min(delay * 2, 3.0)  # 指数バックオフ（上限3秒）
             logger.info(f"Upserted {len(embeddings)} items to {collection_name}")
         except Exception as e:
             logger.error(f"Failed to upsert to {collection_name}: {e}")
@@ -255,11 +288,30 @@ class ChromaVectorStore(VectorStore):
         try:
             collection = self.client.get_collection(name=collection_name)
             
-            results = collection.query(
-                query_embeddings=[query_embedding],
-                n_results=n_results,
-                where=filter
-            )
+            # リトライ付きでquery
+            attempt = 0
+            delay = self.query_retry_initial_delay
+            while True:
+                try:
+                    results = collection.query(
+                        query_embeddings=[query_embedding],
+                        n_results=n_results,
+                        where=filter
+                    )
+                    break
+                except Exception as e:
+                    attempt += 1
+                    if attempt > self.query_max_retries:
+                        raise
+                    logger.warning(
+                        "Chroma query timed out/failed, retrying",
+                        attempt=attempt,
+                        max_retries=self.query_max_retries,
+                        error=str(e)
+                    )
+                    import time
+                    time.sleep(delay)
+                    delay = min(delay * 2, 3.0)
             
             return results
         except Exception as e:
@@ -292,7 +344,10 @@ def get_vector_store(store_type: Optional[str] = None) -> VectorStore:
     """
     if store_type is None:
         store_type = os.getenv("VECTOR_STORE_TYPE", "chroma").lower()
-    if store_type == "chroma" or store_type == "chromadb":
+
+    # Accept aliases commonly used in PaaS configs
+    if store_type in ("chroma", "chromadb", "local", "filesystem"):
+        # For 'local'/'filesystem' we rely on CHROMA_PERSIST_DIRECTORY to persist data
         return ChromaVectorStore()
-    else:
-        raise ValueError(f"Unknown or disabled vector store type: {store_type}")
+
+    raise ValueError(f"Unknown or disabled vector store type: {store_type}")

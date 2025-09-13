@@ -1,29 +1,32 @@
 # Core dependencies
-crewai[tools]==0.159.0
+crewai[tools]==0.186.1
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
-pydantic==2.10.3
-pydantic-settings==2.6.1
+pydantic==2.11.7
+pydantic-settings==2.7.0
 
-# Database and storage
-chromadb==0.5.23
+# Database and storage - 段階的更新アプローチ
+# ChromaDB: CrewAI/crewai-toolsとの互換性確保のため0.5.23で固定
+# chromadbはAPI互換の都合で現状据え置き
+chromadb==0.5.23  # 0.5系安定版（PersistentClient互換）
 #qdrant-client==1.12.0
-sqlalchemy==2.0.36
-alembic==1.14.0
+sqlalchemy==2.0.43
+alembic==1.16.4
 
 # Memory and knowledge
-mem0ai==0.1.115
-ollama==0.3.3
+mem0ai==0.1.116
+# Ollama Python SDK: 最新版に更新（サーバー側は既にlatestで最新版を使用）
+ollama>=0.3.3  # Python SDKの最新版を許可（サーバーバージョンとは独立）
 
 # Monitoring and logging
-structlog==24.4.0
+structlog==25.4.0
 
 # Knowledge Graph
-networkx==3.3
-matplotlib==3.9.0
+networkx==3.5
+matplotlib==3.10.5
 pyvis==0.3.2
 
 # Utilities
-python-dotenv==1.0.1
+python-dotenv==1.1.1
 httpx>=0.27.0,<0.28.0
 pyyaml==6.0.2

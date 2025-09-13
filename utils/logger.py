@@ -313,7 +313,7 @@ _logger_instance: Optional[OkamiLogger] = None
 
 
 def initialize_logger(
-    log_dir: str = "logs",
+    log_dir: str = None,
     log_level: str = None,
     enable_json: bool = None,
     enable_console: bool = True,
@@ -335,6 +335,8 @@ def initialize_logger(
     global _logger_instance
     
     # Get from environment if not provided
+    if log_dir is None:
+        log_dir = os.getenv("OKAMI_LOG_DIR", "logs")
     if log_level is None:
         log_level = os.getenv("OKAMI_LOG_LEVEL", "INFO")
     
