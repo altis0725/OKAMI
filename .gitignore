@@ -102,6 +102,7 @@ temp/
 # Claude Code
 .mcp.json
 CLAUDE.md
+AGENTS.md
 .claude/
 
 # Serena
