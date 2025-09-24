@@ -7,7 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-crewai = {extras = ["tools"], version = "^0.186.1"}
+crewai = {extras = ["tools"], version = "^0.193.2"}
 fastapi = "^0.115.5"
 uvicorn = "^0.32.1"
 pydantic = "^2.10.3"
@@ -17,7 +17,7 @@ python-dotenv = "^1.0.1"
 structlog = "^24.4.0"
 prometheus-client = "^0.21.0"
 httpx = "^0.28.1"
-mem0ai = "^1.1.4"
+mem0ai = "0.1.116"
 opentelemetry-api = "^1.29.0"
 opentelemetry-sdk = "^1.29.0"
 opentelemetry-instrumentation-fastapi = "^0.50b0"

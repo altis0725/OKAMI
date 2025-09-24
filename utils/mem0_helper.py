@@ -35,7 +35,12 @@ def mem0_error_handler(func):
             else:
                 logger.error(f"Unexpected Mem0 error: {e}")
             
-            # エラーを再発生させずに None を返す（エラー許容）
+            # エラーを再発生させずに型に応じたフォールバック値を返す
+            name = getattr(func, "__name__", "")
+            if name.startswith("search"):
+                return []
+            if name.startswith("save"):
+                return False
             return None
     
     return wrapper

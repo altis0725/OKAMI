@@ -16,8 +16,6 @@ services:
       - CREWAI_DISABLE_TELEMETRY=true
       - OTEL_SDK_DISABLED=true
       - LOG_LEVEL=INFO
-      - OLLAMA_HOST=http://ollama:11434
-      - OLLAMA_BASE_URL=http://ollama:11434
       - EMBEDDER_PROVIDER=ollama
       - EMBEDDER_MODEL=mxbai-embed-large
       - VECTOR_STORE_TYPE=chroma
@@ -32,7 +30,6 @@ services:
       # CrewAI知識ベース用の設定
       - CREWAI__EMBEDDINGS__PROVIDER=ollama
       - CREWAI__EMBEDDINGS__MODEL=mxbai-embed-large
-      - CREWAI__EMBEDDINGS__BASE_URL=http://ollama:11434
     env_file:
       - .env
     networks:

@@ -4,13 +4,13 @@
 
 ## 概要
 
-OKAMIは、CrewAI 0.140.0をベースに構築された自己成長型AIエージェントシステムです。複数のエージェントが協調して作業を行い、経験から学習し、知識を蓄積・共有することで、時間とともにより賢く、効率的になっていきます。
+OKAMIは、CrewAI 0.193.x をベースに構築された自己成長型AIエージェントシステムです。複数のエージェントが協調して作業を行い、経験から学習し、知識を蓄積・共有することで、時間とともにより賢く、効率的になっていきます。
 
 ### 🌟 主な特徴
 
 - **自己進化機能**: メインタスク完了後に自動的にEvolution Crewが分析・改善を実行
 - **階層型プロセス**: マネージャーエージェントによるインテリジェントなタスク委譲
-- **Qdrant知識管理**: ベクトル検索対応の高性能知識ベース
+- **ChromaDB 知識管理**: ベクトル検索対応の高性能知識ベース
 - **リアルタイム監視**: Claude Code品質モニタリング統合
 - **マルチLLMサポート**: Monica LLM（GPT-4o互換）+ Ollama埋め込み
 
@@ -92,7 +92,7 @@ OKAMI/
 ## 技術スタック
 
 - **Python**: 3.11+
-- **CrewAI**: 0.159.0 (tools付き)
+- **CrewAI**: 0.193.2 (tools付き)
 - **FastAPI**: REST API
 - **Monica LLM**: GPT-4o互換API
 - **ChromaDB**: ベクトルストレージ
@@ -265,6 +265,119 @@ curl http://localhost:8001/api/v1/heartbeat
 # Ollamaの起動確認
 curl http://localhost:11434/api/tags
 ```
+
+### 3. CrewAI バリデーション関連（埋め込み/マネージャー）
+**症状A**: `Value error, embedder_config is required`（Crew 作成時）
+
+**原因**: CrewAI 0.18x 系では `Crew(embedder=...)` が必要になるケースがあります。
+
+**対処**:
+- 本レポジトリでは `crews/crew_factory.py` が `OkamiConfig.get_embedder_config()` から自動注入します（既定は Ollama `mxbai-embed-large`）。
+- それでも失敗する場合は自動で embedder を外して再試行するフォールバックが入っています（ログに警告が出ます）。
+
+**症状B**: `Manager agent should not be included in agents list`（階層型）
+
+**原因**: 階層型プロセスで `manager_agent` を `agents` 配列に含めると CrewAI がバリデーションエラーにします。
+
+**対処**:
+- 本レポジトリでは Crew 生成時は `manager_agent` を引数で渡し、生成後に `crew.agents` へ追加する実装で両立（テスト互換）しています。
+
+### 4. Mem0 統合（ExternalMemory）
+**症状A**: `Invalid API key` / `401 Unauthorized`
+
+**原因**: `MEM0_API_KEY` が無効。
+
+**対処**:
+- `.env` に `MEM0_API_KEY` を設定し直す。org/project を使用する場合は `org_id` / `project_id` も mem0 側で有効化が必要です。
+
+**症状B**: `ExternalMemory.save() got an unexpected keyword argument 'agent'`
+
+**原因**: CrewAI のバージョン差異。`agent` キーワード未対応のバージョンがあります。
+
+**対処**:
+- `core/memory_manager.py` は位置引数で保存するように修正済み（バージョン差異を吸収）。
+
+**症状C**: `'NoneType' object has no attribute 'save'`（Mem0 ストレージ未初期化）
+
+**原因**: `ExternalMemory` の内部ストレージが未構築。
+
+**対処**:
+- `MemoryManager` 側で遅延初期化（`set_crew(None)`）を行うように修正済み。ログに `Mem0 ExternalMemory initialized successfully` が出るか確認してください。
+
+**補足**:
+- 失敗時はエラーハンドラにより `search*` は `[]`、`save*` は `False` を返し、動作継続します。
+
+### 5. Ollama 埋め込みモデルが見つからない
+**症状**: `model not found` / 埋め込み呼び出しが失敗
+
+**解決策**:
+```bash
+docker exec -it okami-ollama ollama pull mxbai-embed-large
+curl -f http://localhost:11434/api/tags | jq
+```
+`EMBEDDER_MODEL` と `OLLAMA_BASE_URL` が `.env` と compose で一致しているか確認してください。
+
+---
+
+## 変更履歴（重要）
+
+この節は CrewAI 0.193 系対応とコード整理の要点です。
+
+- Crew 作成の安定化（`crews/crew_factory.py`）
+  - `embedder` を `OkamiConfig` から自動注入（既定は Ollama）。失敗時は embedder を外して再試行。
+  - `ShortTermMemory` / `EntityMemory` / `LongTermMemory` に `embedder_config` を明示して作成。
+  - 階層型プロセス: `manager_agent` は引数渡し→Crew 生成後に `crew.agents` に追加（テスト互換）。
+- Mem0 統合の安定化（`core/memory_manager.py`）
+  - `ExternalMemory(embedder_config={"provider": "mem0", ...})` を標準化（バージョン差異を吸収）。
+  - ストレージ未初期化時は遅延初期化（`set_crew(None)`）を実施。
+  - `get_crew_memory_config()` は後方互換のため `external_memory` と Mem0 形の `memory_config` を両方返却。
+  - 失敗時フォールバック: `search` は `[]`、`save` は `False` を返す。
+- MCP ツールの初期化互換（`tools/mcp_gateway_tool.py`）
+  - Pydantic v2 向けに `BaseTool` 初期化をフィールド引数に統一。
+  - `tools/__init__.py` にテストが参照するエクスポートを追加。
+
+### バージョン
+- CrewAI: 0.193.2
+- Mem0: 0.1.116
+- ChromaDB: 0.5.23（HTTPサーバー/永続ボリューム利用）
+
+---
+
+## Mem0 v2 運用ガイド（保存/検索）
+
+本プロジェクトは Mem0 外部メモリを v2 API で運用します（既定）。
+
+### 必須環境変数
+- `MEM0_API_KEY`（必須）
+- 任意: `MEM0_API_BASE`（既定: `https://api.mem0.ai`）
+
+### クルー（YAML）の mem0 設定例
+```yaml
+mem0_config:
+  user_id: "okami_main_crew"
+  # 以下は必要に応じて
+  org_id: "your_org_id"
+  project_id: "your_project_id"
+  run_id: "session_or_run_id"
+  includes: "include1"
+  excludes: "exclude1"
+  infer: true
+```
+
+### どのエンドポイントを使うか
+- 追加(保存): `POST /v1/memories/`（ヘッダ: `Authorization: Token <API_KEY>`、body に `version: "v2"`）
+- 検索(v2): `POST /v2/memories/search/`（ヘッダ: `Authorization: Token <API_KEY>`、body に `filters` 必須。例: `{ "AND": [{"user_id":"..."}] }`）
+
+### メタデータ制限について
+- v2 でもメタデータの文字数制限（~2000文字）があるため、内部で過大時は自動的に切り詰めて再試行します。
+- 厳密な制御が必要な場合は `includes` / `excludes` / `infer` を活用して、保存対象メタデータを絞り込んでください。
+
+### 無効化/切替
+- Mem0 を使わない運用に切り替える場合は、
+  - `.env` から `MEM0_API_KEY` を外す、または
+  - 各クルー YAML の `mem0_config` を一時的にコメントアウトしてください（basic memory にフォールバック）。
+
+
 
 ### 2. Evolution履歴が見つからない
 **症状**: `{"detail":"Not Found"}`

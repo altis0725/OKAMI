@@ -101,43 +101,25 @@ class MemoryManager:
 
             _ver = _parse_ver(getattr(_crewai_pkg, "__version__", "0.0.0"))
 
-            if _ver < (0, 160, 0):
-                # crewai 0.159 系: embedder_config.provider に mem0 を指定
-                self.external_memory = ExternalMemory(
-                    embedder_config={
-                        "provider": "mem0",
-                        "config": {
-                            "user_id": self.mem0_config.get("user_id", "okami_system"),
-                            "run_id": self.mem0_config.get("run_id"),
-                            "org_id": self.mem0_config.get("org_id"),
-                            "project_id": self.mem0_config.get("project_id"),
-                            "api_key": mem0_api_key,
-                            "api_version": "v2"
-                        }
+            # 安定動作のため、CrewAI バージョンに関わらず mem0 を external memory として明示
+            self.external_memory = ExternalMemory(
+                embedder_config={
+                    "provider": "mem0",
+                    "config": {
+                        "user_id": self.mem0_config.get("user_id", "okami_system"),
+                        "run_id": self.mem0_config.get("run_id"),
+                        "org_id": self.mem0_config.get("org_id"),
+                        "project_id": self.mem0_config.get("project_id"),
+                        "api_key": mem0_api_key,
+                        "api_version": "v2"
                     }
-                )
-            else:
-                # crewai 0.160+ 系: embedder_config は埋め込み、memory_config で mem0
-                self.external_memory = ExternalMemory(
-                    embedder_config={
-                        "provider": "ollama",
-                        "config": {
-                            "model": "nomic-embed-text:latest",
-                            "base_url": "http://localhost:11434"
-                        }
-                    },
-                    memory_config={
-                        "provider": "mem0",
-                        "config": {
-                            "user_id": self.mem0_config.get("user_id", "okami_system"),
-                            "run_id": self.mem0_config.get("run_id"),
-                            "org_id": self.mem0_config.get("org_id"),
-                            "project_id": self.mem0_config.get("project_id"),
-                            "api_key": mem0_api_key,
-                            "api_version": "v2"
-                        }
-                    }
-                )
+                }
+            )
+            # Crew が無くても初期化できるようにストレージを構築
+            try:
+                self.external_memory.set_crew(None)
+            except Exception:
+                pass
             self.mem0_initialized = True
             logger.info("Mem0 ExternalMemory initialized successfully (V2 API)")
             
@@ -188,10 +170,20 @@ class MemoryManager:
     def get_crew_memory_config(self) -> Dict[str, Any]:
         """Crew用のメモリ設定を取得（エラー許容モード対応）"""
         if self.external_memory and self.mem0_initialized:
-            # ExternalMemoryが利用可能な場合
+            # ExternalMemoryが利用可能な場合（後方互換のため memory_config も併記）
             return {
                 "memory": True,
-                "external_memory": self.external_memory
+                "external_memory": self.external_memory,
+                "memory_config": {
+                    "provider": "mem0",
+                    "config": {
+                        "user_id": self.mem0_config.get("user_id", "okami_system"),
+                        "org_id": self.mem0_config.get("org_id"),
+                        "project_id": self.mem0_config.get("project_id"),
+                    }
+                ,
+                "user_memory": {}
+                }
             }
         else:
             # 基本メモリプロバイダーを使用（フォールバック）
@@ -208,17 +200,12 @@ class MemoryManager:
     def save_memory(self, key: str, value: str, metadata: Dict[str, Any] = None) -> bool:
         """メモリを保存（エラー許容）"""
         if self.external_memory and self.mem0_initialized:
-            # mem0のAPI形式に合わせてデータを整形
-            from crewai.memory.external.external_memory_item import ExternalMemoryItem
-            
-            memory_item = ExternalMemoryItem(
-                content=value,
-                metadata=metadata or {},
-                key=key
-            )
-            
-            # リスト形式で保存
-            self.external_memory.save([memory_item])
+            # ExternalMemory は value/metadata/agent を受け付ける
+            # ストレージ未初期化の場合は遅延初期化
+            if getattr(self.external_memory, "storage", None) is None:
+                self.external_memory.set_crew(None)
+            # 一部バージョンで agent キーワードが未対応のため位置引数で呼び出す
+            self.external_memory.save(value, metadata or {})
             return True
         return False
 
@@ -226,6 +213,8 @@ class MemoryManager:
     def search_memory(self, query: str, limit: int = 10, score_threshold: float = 0.5) -> List[Dict[str, Any]]:
         """メモリを検索（エラー許容）"""
         if self.external_memory and self.mem0_initialized:
+            if getattr(self.external_memory, "storage", None) is None:
+                self.external_memory.set_crew(None)
             # V2 API対応のパラメータ調整
             try:
                 results = self.external_memory.search(

@@ -153,15 +153,14 @@ class DynamicMCPTool(BaseTool):
             tool_name: Name of the MCP tool
             tool_description: Optional description of the tool
         """
-        # Set attributes before calling super().__init__()
-        self.name = f"mcp_{tool_name}"
-        self.description = tool_description or f"""
-        Access the {tool_name} MCP tool.
-        This tool provides dynamic access to {tool_name} functionality through MCP.
-        """
-        super().__init__()
-        # Store tool name after initialization
-        self._mcp_tool_name = tool_name
+        description = tool_description or (
+            f"Access the {tool_name} MCP tool.\n"
+            f"This tool provides dynamic access to {tool_name} functionality through MCP."
+        )
+        # Initialize BaseTool (Pydantic model) with fields
+        super().__init__(name=f"mcp_{tool_name}", description=description)
+        # Store tool name after initialization (non-pydantic attr)
+        object.__setattr__(self, "_mcp_tool_name", tool_name)
     
     def _run(self, action: str, **kwargs) -> str:
         """

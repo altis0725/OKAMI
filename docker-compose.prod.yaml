@@ -52,11 +52,8 @@ services:
       # CrewAI知識ベース用の設定
       - CREWAI__EMBEDDINGS__PROVIDER=${EMBEDDER_PROVIDER:-ollama}
       - CREWAI__EMBEDDINGS__MODEL=${EMBEDDER_MODEL:-nomic-embed-text:v1.5}  # 最軽量モデル
-      - CREWAI__EMBEDDINGS__BASE_URL=http://ollama:11434
       
       # Ollama設定（Docker内部で動作）
-      - OLLAMA_HOST=http://ollama:11434
-      - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_MODEL=${OLLAMA_MODEL:-nomic-embed-text:v1.5}  # 最軽量モデル
       
       # MCP Gateway設定（オプション）

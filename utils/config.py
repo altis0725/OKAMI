@@ -9,6 +9,7 @@ from pathlib import Path
 import json
 import yaml
 from pydantic_settings import BaseSettings
+import logging
 from pydantic import Field, field_validator
 from dotenv import load_dotenv
 
@@ -183,19 +184,38 @@ class OkamiConfig(BaseSettings):
             config["config"]["api_key"] = self.huggingface_api_key
             config["config"]["api_url"] = "https://api-inference.huggingface.co"
         elif provider == "ollama":
-            # Ollama最適化設定（Context7 & コミュニティ推奨）
-            config["config"].update({
-                "base_url": self.ollama_base_url,
+            # EmbeddingConfigurator は `url` キーを参照するため、こちらを優先
+            base = self.ollama_base_url.rstrip("/")
+
+            # コンテナ内から `localhost` を叩かないように自動補正（Mac/Docker Desktop想定）
+            try:
+                in_docker = os.path.exists("/.dockerenv") or os.getenv("IN_DOCKER") == "1"
+                if in_docker and ("localhost" in base or "127.0.0.1" in base):
+                    base = base.replace("localhost", "host.docker.internal").replace("127.0.0.1", "host.docker.internal")
+            except Exception:
+                pass
+
+            cfg = {
+                "url": f"{base}/api/embeddings",
+                # 参考情報（ツール側で使わないが記録として残す）
+                "base_url": base,
                 "batch_size": self.embedding_batch_size,
                 "max_retries": self.embedding_max_retries,
                 "retry_delay": self.embedding_retry_delay,
-                # 互換メモ: Python SDK は /api/embeddings を内部で使用。記録のみ。
-                "api_endpoint": "/api/embeddings",
                 "truncate": True,
                 "keep_alive": "5m",
                 "verbose": True,
-                "debug": True
-            })
+                "debug": True,
+            }
+            # ログ（DEBUG）
+            try:
+                logging.getLogger(__name__).debug(
+                    "Resolved Ollama embedder URL",
+                    extra={"url": cfg["url"], "base_url": cfg["base_url"]},
+                )
+            except Exception:
+                pass
+            config["config"].update(cfg)
 
         return config
 
